@@ -1,0 +1,16 @@
+# Union of all agent requirements — deploy/pi_deploy.sh installs these into agents/venv
+flask
+anthropic
+requests
+python-dotenv
+pytz
+python-dateutil
+apscheduler
+gspread
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+elevenlabs
+openai
+google-genai

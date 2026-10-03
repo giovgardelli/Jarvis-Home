@@ -1,0 +1,18 @@
+# The voice loop's user service. Install (adjust REPO if you cloned elsewhere):
+#   REPO=~/jarvis-home
+#   sed "s|@REPO@|$REPO|g" $REPO/deploy/jarvis-voice.service.example > ~/.config/systemd/user/jarvis.service
+#   systemctl --user daemon-reload && systemctl --user enable --now jarvis
+# %h is your home directory; the voice venv is expected at ~/jarvis-env.
+[Unit]
+Description=Jarvis voice loop
+After=network-online.target sound.target
+
+[Service]
+Type=simple
+WorkingDirectory=@REPO@
+ExecStart=/bin/bash -c 'set -a; source %h/.jarvis_env; set +a; exec %h/jarvis-env/bin/python -u jarvis-pi.py'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

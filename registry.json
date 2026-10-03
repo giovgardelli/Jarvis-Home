@@ -1,0 +1,135 @@
+{
+  "agents": [
+    {
+      "id": "andy_mann",
+      "display_name": "Andy Mann",
+      "routing_hint": "home maintenance ONLY — HVAC, plumbing, appliances, warranties, contractors, property info, seasonal checklists",
+      "access": "household",
+      "endpoint": "http://127.0.0.1:5001/jarvis",
+      "bot_username": "@AndyMannHomeBot",
+      "capabilities": [
+        "home maintenance tasks and reminders",
+        "property information and profile",
+        "warranties and appliance records",
+        "contractor contacts and history",
+        "weather alerts and air quality",
+        "seasonal checklists",
+        "repair job logs"
+      ],
+      "example_phrases": [
+        "remind me to service the HVAC",
+        "when is the furnace filter due",
+        "add a warranty for the dishwasher",
+        "who's our plumber",
+        "what's the weather looking like"
+      ],
+      "notify_targets": {
+        "gio": "GIO_CHAT_ID",
+        "kenz": "KENZ_CHAT_ID"
+      }
+    },
+    {
+      "id": "drew_parture",
+      "display_name": "Drew Parture",
+      "routing_hint": "flights, travel, airline, departure, arrival",
+      "access": "personal",
+      "endpoint": "http://127.0.0.1:5002/jarvis",
+      "bot_username": "@DrewPartureBot",
+      "capabilities": [
+        "flight tracking and status",
+        "travel schedule from Google Calendar",
+        "departure and arrival alerts",
+        "flight delay monitoring",
+        "Uber ride booking deep links"
+      ],
+      "example_phrases": [
+        "what time is my flight",
+        "any delays today",
+        "book me an Uber to the airport",
+        "when does Kenz land",
+        "what flights do I have this week"
+      ],
+      "notify_targets": {
+        "gio": "GIO_CHAT_ID",
+        "kenz": "KENZ_CHAT_ID"
+      }
+    },
+    {
+      "id": "shawn_ping",
+      "display_name": "Shawn Ping",
+      "routing_hint": "shopping list, groceries, items to buy",
+      "access": "household",
+      "endpoint": "http://127.0.0.1:5003/jarvis",
+      "bot_username": "@ShawnPingBot",
+      "capabilities": [
+        "shared grocery and shopping list",
+        "add items to shopping list",
+        "remove items from shopping list",
+        "view current shopping list"
+      ],
+      "example_phrases": [
+        "add oat milk to the list",
+        "what's on the shopping list",
+        "remove item 3",
+        "we need eggs and butter",
+        "clear the shopping list"
+      ],
+      "notify_targets": {
+        "gio": "GIO_CHAT_ID",
+        "kenz": "KENZ_CHAT_ID"
+      }
+    },
+    {
+      "id": "will_due",
+      "display_name": "Will Due",
+      "routing_hint": "personal tasks, to-do list, reminders, things to do, errands, general tasks NOT related to home maintenance",
+      "access": "personal",
+      "needs_speaker": true,
+      "endpoint": "http://127.0.0.1:5004/jarvis",
+      "bot_username": "@WillDueBot",
+      "capabilities": [
+        "shared to-do list for Gio, Kenz, or both",
+        "add tasks with priority and owner",
+        "complete or remove tasks",
+        "view tasks filtered by owner or priority",
+        "track who added what and when"
+      ],
+      "example_phrases": [
+        "add a task to call the electrician",
+        "what are my tasks this week",
+        "mark task 2 as done",
+        "add a shared task to plan the trip",
+        "what's on Kenz's list"
+      ],
+      "notify_targets": {
+        "gio": "GIO_CHAT_ID",
+        "kenz": "KENZ_CHAT_ID"
+      }
+    },
+    {
+      "id": "miles_ahead",
+      "display_name": "Miles Ahead",
+      "routing_hint": "Southwest price tracking, flight prices",
+      "access": "personal",
+      "endpoint": "http://127.0.0.1:5005/jarvis",
+      "bot_username": "@MilesAheadBot",
+      "capabilities": [
+        "Southwest Airlines flight price tracking",
+        "monitor price drops on booked flights",
+        "alert when cheaper fares are found",
+        "pause or resume monitoring specific flights",
+        "list monitored flights"
+      ],
+      "example_phrases": [
+        "check my Southwest prices",
+        "any price drops on my flights",
+        "pause monitoring WN1234",
+        "list my tracked flights",
+        "is there a cheaper fare to SF"
+      ],
+      "notify_targets": {
+        "gio": "GIO_CHAT_ID"
+      }
+    }
+  ]
+}

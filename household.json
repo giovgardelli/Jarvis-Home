@@ -1,0 +1,27 @@
+{
+  "_comment": "Who lives here. id is used in code and env names (e.g. GIO_CHAT_ID); name is how Jarvis says it; aliases are other spellings speech-to-text may produce (matched, not boosted); keyterms are extra words to boost in speech-to-text (e.g. a full name). default_speaker is used when nobody is identified.",
+  "default_speaker": "gio",
+  "members": [
+    {
+      "id": "gio",
+      "name": "Gio",
+      "aliases": [
+        "geo",
+        "giovanni"
+      ]
+    },
+    {
+      "id": "kenz",
+      "name": "Kenz",
+      "aliases": [
+        "kenzie",
+        "makenzie",
+        "mackenzie",
+        "mckenzie"
+      ],
+      "keyterms": [
+        "Makenzie"
+      ]
+    }
+  ]
+}

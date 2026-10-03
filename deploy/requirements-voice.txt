@@ -1,0 +1,18 @@
+# Voice loop (jarvis-pi.py) — its own venv (~/jarvis-env), separate from the
+# agents' venv. From the repo root:
+#   python3 -m venv ~/jarvis-env
+#   ~/jarvis-env/bin/pip install -r deploy/requirements-voice.txt
+pyaudio
+numpy
+openwakeword
+# jarvis-pi.py uses the v3 client API (listen.rest.v("1")); v4+ changed it
+deepgram-sdk>=3,<4
+elevenlabs
+resemblyzer
+soundfile
+apscheduler
+pytz
+requests
+anthropic
+google-genai
+blinkstick

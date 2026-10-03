@@ -1,0 +1,27 @@
+# secrets — never commit
+.env
+token.json
+credentials.json
+
+# python
+__pycache__/
+*.pyc
+
+# virtualenvs
+venv/
+*-env/
+
+# runtime data (if JARVIS_HOME points inside the repo)
+voice_profiles/
+voice_responses/
+wakeword_samples/
+acks/
+brief_*.mp3
+brief_*.txt
+timers.json
+timers.json.tmp
+routing_log.csv*
+alert_state.json
+*.db
+*.log
+*.wav

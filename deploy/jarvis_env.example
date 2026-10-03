@@ -1,0 +1,33 @@
+# ~/.jarvis_env — settings shared by the voice loop and every agent.
+# Copy to ~/.jarvis_env, fill in, and keep it out of git (chmod 600 ~/.jarvis_env).
+# Each agent ALSO reads its own agents/<name>/.env (see .env.example there).
+
+# ── Required by most pieces ──────────────────────────────────────────────────
+ANTHROPIC_API_KEY=            # console.anthropic.com — routing + agent replies (Claude Haiku)
+JARVIS_SECRET=                # any long random string; agents only accept requests carrying it
+                              #   python3 -c "import secrets; print(secrets.token_hex(32))"
+
+# Google (Sheets + Calendar) — one OAuth client for all agents; see docs/setup.md
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REFRESH_TOKEN=
+
+# ── Voice assistant (jarvis-pi.py) ───────────────────────────────────────────
+DEEPGRAM_API_KEY=             # speech-to-text
+ELEVENLABS_API_KEY=           # text-to-speech
+ELEVENLABS_VOICE_ID=          # optional; defaults to a built-in voice
+GEMINI_API_KEY=               # web-search answers (also used by the model check)
+# GEMINI_MODEL=gemini-3.5-flash-lite
+
+# ── Optional settings (defaults shown) ───────────────────────────────────────
+# JARVIS_TIMEZONE=America/Los_Angeles
+# JARVIS_HOME=~                    # where runtime files live
+# JARVIS_SPEAKER=                  # default person (else household.json default_speaker)
+# JARVIS_MIC_NAME=EMEET            # part of your microphone's device name
+# JARVIS_AUDIO_OUT=hw:2,0          # speaker device for aplay (see `aplay -l`)
+# JARVIS_WAKEWORD_MODEL=           # path to a custom openWakeWord model
+
+# Voice ID (who is speaking) — off by default; see docs/voice-id.md
+# VOICE_ID_ENABLED=false
+# VOICE_ID_CONFIRMED=0.78
+# VOICE_ID_UNCERTAIN=0.73
