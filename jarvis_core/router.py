@@ -505,7 +505,7 @@ def _truncate_for_voice(text, speaker):
         f"  Today is {datetime.now(pytz.timezone(TIMEZONE)).strftime('%A %B %d %Y')}.\n"
         "  If the flight is 7 days or fewer away: say the day of week (e.g. 'this Monday').\n"
         "  If the flight is more than 7 days away: say the full date (e.g. 'June 3rd') — NEVER say just the day of week.\n"
-        "  Always include morning, afternoon, or evening based on departure time.\n"
+        "  Always include the departure time (e.g. 'at 7:45 AM') and the destination city.\n"
         "- ONLY add 'There are a few more — want to hear them?' if you cut items out\n"
         "- If all items fit, do NOT add that offer\n\n"
         "Full response:\n" + text

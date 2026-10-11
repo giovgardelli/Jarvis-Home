@@ -110,9 +110,6 @@ class FlightAlerts(unittest.TestCase):
         self.assertEqual(sent, ["🛬 *Gio has landed!*"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class SouthwestTitleParsing(unittest.TestCase):
     def parse(self, title, description=""):
@@ -133,3 +130,57 @@ class SouthwestTitleParsing(unittest.TestCase):
     def test_route_in_description_still_wins(self):
         f = self.parse("Southwest WN 1234", "LAX 08:00 - SFO 09:30")
         self.assertEqual((f["origin"], f["destination"]), ("LAX", "SFO"))
+
+
+class NextFlightAnswer(unittest.TestCase):
+    """"What's my next flight?" must say airline, destination city and departure time."""
+
+    def load(self):
+        install_stubs()
+        path = os.path.join(AGENTS, "drew_parture")
+        with isolated_modules(path=path, drop=("calendar_reader",)):
+            cal = load_file(os.path.join(path, "calendar_reader.py"), "calendar_reader")
+            agent = load_file(os.path.join(path, "agent.py"), "drew_agent_under_test")
+        return cal, agent
+
+    def parse(self, cal, title, description=""):
+        return cal.parse_flight_from_event({"summary": title, "description": description,
+                                            "start": {"dateTime": "2026-10-06T07:45:00-07:00"}, "end": {}})
+
+    def test_alaska_event_gives_airline_name_number_and_destination(self):
+        cal, _ = self.load()
+        f = self.parse(cal, "Flight to Seattle (AS 1234)")
+        self.assertEqual((f["airline_name"], f["flight_number"], f["destination"]),
+                         ("Alaska Airlines", "AS1234", "SEA"))
+        f = self.parse(cal, "Alaska Airlines AS 1234", "LAX to SEA")
+        self.assertEqual((f["origin"], f["destination"]), ("LAX", "SEA"))
+
+    def test_google_calendar_flight_event_format(self):
+        # The format Google Calendar uses for flights it adds from booking
+        # emails (made-up flight)
+        cal, _ = self.load()
+        f = cal.parse_flight_from_event({
+            "summary": "Flight to Portland (AS 517)", "location": "Seattle SEA",
+            "description": "Alaska Airlines flight 517\nSeattle SEA 14:10 (local time) - "
+                           "Portland PDX 15:05 (local time)\n\nConfirmation number: TESTCF",
+            "start": {"dateTime": "2025-03-14T14:10:00-07:00"}, "end": {"dateTime": "2025-03-14T15:05:00-07:00"}})
+        self.assertEqual((f["flight_number"], f["airline_name"], f["origin"], f["destination"], f["confirmation"]),
+                         ("AS517", "Alaska Airlines", "SEA", "PDX", "TESTCF"))
+
+    def test_spoken_answer_has_time_and_city(self):
+        cal, agent = self.load()
+        f = self.parse(cal, "Flight to Seattle (AS 1234)")
+
+        class FakeDT(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return datetime(2026, 10, 3, 9, 0, tzinfo=PT)
+        agent.datetime = FakeDT
+        self.assertEqual(agent.format_flight_spoken(f),
+                         "Your next flight is Alaska Airlines to Seattle, on Tuesday at 7:45 AM.")
+        self.assertEqual(agent.format_flight_spoken(f, speaker="kenz"),
+                         "Gio's next flight is Alaska Airlines to Seattle, on Tuesday at 7:45 AM.")
+
+
+if __name__ == "__main__":
+    unittest.main()

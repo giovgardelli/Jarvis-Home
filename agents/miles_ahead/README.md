@@ -5,7 +5,13 @@ as travel credit (check their current policy).
 Miles Ahead finds your booked Southwest flights in Google Calendar, tracks
 what you paid, checks current fares every morning (6:00), and messages you
 when the same flight — or another Southwest flight within an hour of it —
-gets cheaper.
+gets cheaper. Other airlines' flights are ignored here (Drew Parture still
+sends their delay and departure alerts).
+
+A flight is picked up when the calendar event's title has its flight number
+(`WN 1234`) and the route can be read from the event: two airport codes
+(`LAX … SFO`) in the title or description. To add an airline with the same
+kind of policy, add it to `TRACKED_AIRLINES` in `calendar_reader.py`.
 
 - Only alerts when you'd save **more than $5**
 - Skips flights bought for under $55

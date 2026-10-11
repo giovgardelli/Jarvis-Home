@@ -1,7 +1,7 @@
 import os
 from datetime import date, datetime
-from calendar_reader import get_southwest_flights
-from scraper import get_google_flights, get_southwest_price, get_cheapest_southwest
+from calendar_reader import get_tracked_flights, tracked_airline
+from scraper import get_google_flights, get_flight_price
 from sheets import get_flight, add_flight, update_flight_field, set_flight_status, get_active_flights, should_check_today
 
 # Southwest fares bottom out around $49; anything bought below this can't
@@ -37,7 +37,7 @@ def sync_cancelled_flights():
     print("Syncing cancelled flights...", flush=True)
     
     # Get all calendar flights
-    calendar_flights = get_southwest_flights(days_ahead=60)
+    calendar_flights = get_tracked_flights(days_ahead=60)
     calendar_keys = set()
     for f in calendar_flights:
         calendar_keys.add(f"{f['flight_number']}_{f['date']}")
@@ -71,8 +71,8 @@ def run_daily_check():
     sync_cancelled_flights()
 
     # Step 1 — Find Southwest flights in calendar
-    calendar_flights = get_southwest_flights(days_ahead=60)
-    print(f"Found {len(calendar_flights)} Southwest flights in calendar", flush=True)
+    calendar_flights = get_tracked_flights(days_ahead=60)
+    print(f"Found {len(calendar_flights)} tracked flights in calendar", flush=True)
 
     # Step 2 — Add any new flights to the sheet
     for flight in calendar_flights:
@@ -84,7 +84,7 @@ def run_daily_check():
             print(f"New flight found: {flight_num} on {date_str} — getting initial price", flush=True)
             origin = flight["origin"]
             destination = flight["destination"]
-            price = get_southwest_price(origin, destination, date_str, flight_num)
+            price = get_flight_price(origin, destination, date_str, flight_num)
 
             if price:
                 add_flight(
@@ -119,7 +119,7 @@ def run_daily_check():
         except:
             continue
 
-        # At/below the Southwest floor there's nothing to save — skip the API call
+        # At/below the fare floor there's nothing to save — skip the API call
         if paid_price < MIN_TRACK_PRICE:
             print(f"Skipping {flight_num} — paid ${paid_price} is below the ${MIN_TRACK_PRICE} floor", flush=True)
             continue
@@ -168,14 +168,12 @@ def run_daily_check():
             diff = min(diff, 1440 - diff)  # handle wrap across midnight
             return diff <= 60
 
-        # Excluded airlines
-        excluded_airlines = ["frontier"]
-
-        # Filter: Southwest only, no Frontier, within 1 hour of original departure
+        # Same airline only (a cheaper fare on another airline can't be
+        # rebooked for credit), within 1 hour of the original departure
+        airline, rebook_site = tracked_airline(flight_num) or ("Southwest", "southwest.com")
         sw_flights = [
             f for f in all_prices
-            if "southwest" in f.get("airline", "").lower()
-            and not any(ex in f.get("airline", "").lower() for ex in excluded_airlines)
+            if airline.lower() in f.get("airline", "").lower()
             and (not orig_departure or within_one_hour(f.get("departs", ""), orig_departure))
         ]
         cheaper_sw = [f for f in sw_flights if f.get("price", 999) < paid_price]
@@ -194,13 +192,13 @@ def run_daily_check():
                 msg += f"✅ Same route now: *${best['price']}* (save *${savings}*)\n"
                 if best.get("departs"):
                     msg += f"🕐 Departs: {best['departs']}\n"
-                msg += f"\n👉 Cancel and rebook on southwest.com"
+                msg += f"\n👉 Rebook on {rebook_site}"
                 alerts.append(msg)
                 print(f"Deal found for {flight_num}: save ${savings}", flush=True)
             else:
                 print(f"Cheaper price found for {flight_num} but only ${savings} — below ${MIN_SAVINGS_TO_ALERT} alert threshold", flush=True)
         else:
             update_flight_field(flight_num, date_str, "Cheaper Found", "No")
-            print(f"No cheaper Southwest options for {flight_num}", flush=True)
+            print(f"No cheaper {airline} options for {flight_num}", flush=True)
 
     return alerts, {"checked": checked_count, "deals": deals_count}
