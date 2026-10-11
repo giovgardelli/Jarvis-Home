@@ -1,5 +1,6 @@
 import os
 from jarvis_core.config import TIMEZONE
+from jarvis_core import llm
 import anthropic
 from datetime import date, datetime
 import pytz
@@ -143,12 +144,13 @@ def chat(text, history=None, speaker="gio", voice_mode=False):
     })
 
     response = client.messages.create(
-        model=os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"),
-        max_tokens=500,
+        model=os.environ.get("ANTHROPIC_MODEL") or llm.MODEL,
+        max_tokens=650,
+        extra_body=llm.fast(),
         system=SYSTEM_PROMPT,
         messages=messages
     )
-    reply, voice_text = split_voice(response.content[0].text)
+    reply, voice_text = split_voice(llm.text(response))
 
     # Parse and execute commands — derive status from what actually ran
     status = "chat"

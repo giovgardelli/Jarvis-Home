@@ -34,6 +34,7 @@ LIST_HINTS = ["list", "shopping", "what's on", "whats on", "what do we have",
 
 
 from jarvis_core.voice import VOICE_INSTRUCTION, split_voice  # noqa: E402
+from jarvis_core import llm
 
 
 def format_list(items):
@@ -101,8 +102,9 @@ def process_message(text, sender_name, voice_mode=False, chat_id=None, history=N
     list_context = format_list(items)
 
     response = client.messages.create(
-        model=os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"),
-        max_tokens=300,
+        model=os.environ.get("ANTHROPIC_MODEL") or llm.MODEL,
+        max_tokens=400,
+        extra_body=llm.fast(),
         system=SYSTEM_PROMPT,
         messages=[
             *(history if history else []),
@@ -114,7 +116,7 @@ def process_message(text, sender_name, voice_mode=False, chat_id=None, history=N
         ]
     )
 
-    reply, voice_text = split_voice(response.content[0].text)
+    reply, voice_text = split_voice(llm.text(response))
     lines = reply.split("\n")
 
     # Parse and execute commands — derive status from what actually ran

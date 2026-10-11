@@ -13,6 +13,11 @@ See README.md for the architecture and docs/ for guides.
 - Voice ID is optional and off by default (`VOICE_ID_ENABLED`); keep its code.
 - Changing the voice-ID audio path (`prepare_audio` / `voice_id.py` /
   `enroll.py`) requires users to re-enroll — call it out in the change.
+- Claude calls go through `jarvis_core/llm.py`: model from `CLAUDE_MODEL`,
+  `llm.fast()` (thinking off) on anything a person waits for, and `llm.text()`
+  to read replies (never `content[0]` — Haiku 5.5 can return thinking blocks
+  and refusals). Don't write model IDs in `.py` files other than `llm.py`:
+  the model check scans the code for them.
 - Agents start via `agents/<name>/pi_run.py`, which puts the repo root on
   `sys.path`; shared code is imported as `jarvis_core.*`.
 - Runtime paths come from `jarvis_core/config.py` (`JARVIS_HOME`, default ~).
