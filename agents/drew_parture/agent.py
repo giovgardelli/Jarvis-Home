@@ -1,5 +1,6 @@
 import os
 from jarvis_core.config import TIMEZONE
+from jarvis_core import llm
 import anthropic
 from datetime import datetime
 import pytz
@@ -192,12 +193,13 @@ def chat(user_message, history=[], speaker="gio", voice_mode=False):
 
     system = SYSTEM_PROMPT_GIO if speaker == "gio" else SYSTEM_PROMPT_KENZ
     response = client.messages.create(
-        model=os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"),
-        max_tokens=300,
+        model=os.environ.get("ANTHROPIC_MODEL") or llm.MODEL,
+        max_tokens=400,
+        extra_body=llm.fast(),
         system=system,
         messages=[
             *history,
             {"role": "user", "content": f"{context}\n\nQuestion: {user_message}" + (VOICE_INSTRUCTION if voice_mode else "")}
         ]
     )
-    return response.content[0].text.strip()
+    return llm.text(response)

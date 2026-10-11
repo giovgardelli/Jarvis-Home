@@ -27,6 +27,9 @@ GEMINI_API_KEY=               # web-search answers (also used by the model check
 # JARVIS_AUDIO_OUT=hw:2,0          # speaker device for aplay (see `aplay -l`)
 # JARVIS_WAKEWORD_MODEL=           # path to a custom openWakeWord model
 
+# Claude model for every call — see docs/hardware-and-costs.md ("Models")
+# CLAUDE_MODEL=claude-haiku-5-5
+
 # Voice ID (who is speaking) — off by default; see docs/voice-id.md
 # VOICE_ID_ENABLED=false
 # VOICE_ID_CONFIRMED=0.78

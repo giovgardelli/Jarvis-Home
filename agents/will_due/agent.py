@@ -85,6 +85,7 @@ DISPLAY RULES:
 - If a task says "end of month" or "this month" and there are fewer than 5 days left in the month, treat it as Urgent"""
 
 from jarvis_core.voice import VOICE_INSTRUCTION, split_voice  # noqa: E402
+from jarvis_core import llm
 
 
 # Queries that are asking to SEE the list (used to set status="list")
@@ -181,12 +182,13 @@ def process_message(text, sender_name, sender_chat_id, history=None, voice_mode=
     })
 
     response = client.messages.create(
-        model=os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"),
-        max_tokens=500,
+        model=os.environ.get("ANTHROPIC_MODEL") or llm.MODEL,
+        max_tokens=650,
+        extra_body=llm.fast(),
         system=SYSTEM_PROMPT,
         messages=messages
     )
-    reply, voice_text = split_voice(response.content[0].text)
+    reply, voice_text = split_voice(llm.text(response))
 
     # Parse and execute commands — status derived from what actually ran
     status = "chat"

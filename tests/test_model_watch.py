@@ -37,7 +37,9 @@ class ModelWatch(unittest.TestCase):
 
     def test_finds_models_actually_used(self):
         in_use = self.mw.find_models_in_use()
-        self.assertIn("claude-haiku-4-5-20251001", in_use["Anthropic (Claude)"])
+        self.assertIn("claude-haiku-5-5", in_use["Anthropic (Claude)"])
+        self.assertNotIn("claude-haiku-4-5-20251001", in_use["Anthropic (Claude)"],
+                         "the rollback ID lives in the docs, not the code")
         self.assertIn("gemini-3.5-flash-lite", in_use["Google (Gemini)"])
         self.assertIn("nova-3", in_use["Deepgram (speech-to-text)"])
         self.assertIn("eleven_flash_v2_5", in_use["ElevenLabs (text-to-speech)"])

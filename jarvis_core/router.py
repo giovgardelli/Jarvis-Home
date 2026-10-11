@@ -25,14 +25,14 @@ from datetime import datetime, timedelta
 import pytz
 from concurrent.futures import ThreadPoolExecutor
 
-from jarvis_core import household, state
+from jarvis_core import household, llm, state
 from jarvis_core.registry import access, agent as registry_agent, agent_ids, needs_speaker, routing_lines
 from jarvis_core.voice import split_voice as _split_voice
 
 JARVIS_SECRET  = os.environ["JARVIS_SECRET"]
 ANTHROPIC_KEY  = os.environ["ANTHROPIC_API_KEY"]
 AGENT_TIMEOUT  = 70
-ROUTER_MODEL   = "claude-haiku-4-5-20251001"
+ROUTER_MODEL   = llm.MODEL   # CLAUDE_MODEL in ~/.jarvis_env (jarvis_core/llm.py)
 PT             = pytz.timezone(TIMEZONE)
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
@@ -511,11 +511,12 @@ def _truncate_for_voice(text, speaker):
         "Full response:\n" + text
     )
     resp = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=200,
-        messages=[{"role": "user", "content": prompt}]
+        model=ROUTER_MODEL,
+        max_tokens=300,
+        messages=[{"role": "user", "content": prompt}],
+        extra_body=llm.fast(),
     )
-    truncated = resp.content[0].text.strip()
+    truncated = llm.text(resp)
     has_more = "want to hear" in truncated.lower()
     return {"truncated": truncated, "has_more": has_more}
 
@@ -575,11 +576,11 @@ def _parse_timer_intent(text: str) -> dict:
     )
     resp = client.messages.create(
         model=ROUTER_MODEL,
-        max_tokens=200,
+        max_tokens=300,
         messages=[{"role": "user", "content": prompt}],
-        extra_body=_structured(TIMER_SCHEMA),
+        extra_body=llm.fast(_structured(TIMER_SCHEMA)),
     )
-    return json.loads(resp.content[0].text)
+    return json.loads(llm.text(resp))
 
 
 def _next_occurrence(hhmm: str) -> float:
@@ -739,10 +740,11 @@ def _merge(text, speaker, results, voice_mode):
     )
     resp = client.messages.create(
         model=ROUTER_MODEL,
-        max_tokens=700,
-        messages=[{"role": "user", "content": prompt}]
+        max_tokens=950,
+        messages=[{"role": "user", "content": prompt}],
+        extra_body=llm.fast(),
     )
-    full_text, voice_text = _split_voice(resp.content[0].text.strip())
+    full_text, voice_text = _split_voice(llm.text(resp))
     return _render({"response_text": full_text, "voice_text": voice_text}, speaker, voice_mode)
 
 
@@ -807,12 +809,12 @@ def _route_with_haiku(text, speaker, history, voice_mode, task_hint=None):
     try:
         resp = client.messages.create(
             model=ROUTER_MODEL,
-            max_tokens=200,
+            max_tokens=300,
             messages=[{"role": "user", "content": _build_routing_prompt(
                 text, speaker, history=history, voice_mode=voice_mode, task_hint=task_hint)}],
-            extra_body=_structured(_routing_schema()),
+            extra_body=llm.fast(_structured(_routing_schema())),
         )
-        routing = json.loads(resp.content[0].text)
+        routing = json.loads(llm.text(resp))
         agent_name = routing.get("agent") or "jarvis"
         intent = routing.get("intent") or text
         print(f"[Router] Haiku route → {agent_name} ({(time.time()-t_haiku)*1000:.0f}ms)", flush=True)

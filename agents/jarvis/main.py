@@ -9,7 +9,7 @@ import pytz
 from flask import Flask, request, jsonify
 from speaker import identify_speaker
 from agent import jarvis_respond
-from jarvis_core import state
+from jarvis_core import llm, state
 
 app = Flask(__name__)
 
@@ -179,11 +179,12 @@ def make_speakable(text: str, speaker: str) -> str:
     )
     c = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     resp = c.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=300,
-        messages=[{"role": "user", "content": prompt}]
+        model=llm.MODEL,
+        max_tokens=400,
+        messages=[{"role": "user", "content": prompt}],
+        extra_body=llm.fast(),
     )
-    return resp.content[0].text.strip()
+    return llm.text(resp)
 
 
 def generate_tts(text: str) -> bytes:
@@ -229,11 +230,12 @@ def build_briefing_intro(user_input: str, speaker: str) -> str:
         "Be natural and varied. One sentence only. No markdown."
     )
     resp = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=80,
-        messages=[{"role": "user", "content": prompt}]
+        model=llm.MODEL,
+        max_tokens=120,
+        messages=[{"role": "user", "content": prompt}],
+        extra_body=llm.fast(),
     )
-    return resp.content[0].text.strip()
+    return llm.text(resp)
 
 
 def process_message(chat_id: int, text: str, speaker: str, voice_mode: bool):
@@ -392,11 +394,12 @@ def run_morning_briefing():
         )
 
         resp = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=400,
+            model=llm.MODEL,
+            max_tokens=550,
+            extra_body=llm.fast(),
             messages=[{"role": "user", "content": summary_prompt}]
         )
-        text_summary = resp.content[0].text.strip()
+        text_summary = llm.text(resp)
 
         if chat_id:
             message_text = text_summary
@@ -424,11 +427,12 @@ def run_morning_briefing():
             + text_summary
         )
         audio_resp = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=100,
+            model=llm.MODEL,
+            max_tokens=140,
+            extra_body=llm.fast(),
             messages=[{"role": "user", "content": audio_prompt}]
         )
-        audio_text = audio_resp.content[0].text.strip()
+        audio_text = llm.text(audio_resp)
 
         try:
             from tts import synthesize

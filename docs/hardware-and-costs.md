@@ -46,3 +46,15 @@ What drives cost, roughly in order:
 | Google Sheets / Calendar, Telegram | Free | — |
 
 The voice assistant is the main cost; the Telegram-only agents are cheap.
+
+## Models
+
+Every Claude call uses one model, set by `CLAUDE_MODEL` in `~/.jarvis_env`
+(default `claude-haiku-5-5`; code in `jarvis_core/llm.py`). Haiku 5.5 is
+about a tenth of Haiku 4.5's per-token price, though the same text counts as
+roughly 30% more tokens. Every call runs with the model's "thinking"
+switched off, for speed.
+
+To go back to Haiku 4.5, set `CLAUDE_MODEL=claude-haiku-4-5-20251001` and
+restart the services. A single agent can use a different model with
+`ANTHROPIC_MODEL` in its own `.env`.
