@@ -17,6 +17,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from openwakeword.model import Model
 import pytz
 from jarvis_core.router import route as router_route
+from jarvis_core.voice import expects_reply
 from jarvis_core.config import VOICE_ID_ENABLED
 from voice_id import identify as voice_id_identify
 from voice_id import warmup as voice_id_warmup
@@ -547,9 +548,10 @@ def _handle_command(p, audio_device, t0):
 
     print(f"[TIMER] Total: {time.time()-t0:.2f}s", flush=True)
 
-    # Follow-up window if response ends with a question
-    if response_text.rstrip().endswith("?"):
-        print("[Follow-up] Response ended with question, opening 4s window...", flush=True)
+    # Follow-up window only when Jarvis asked something it needs answered
+    # (not after statements or "anything else?" — it would pick up the room)
+    if expects_reply(response_text):
+        print("[Follow-up] Response ended with a question, opening 4s window...", flush=True)
         try:
             stt_wav, id_wav = prepare_audio(record_command(p, audio_device, max_seconds=4))
             future_voice = _executor.submit(identify_speaker_voice, id_wav)

@@ -27,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from jarvis_core import household, state
 from jarvis_core.registry import access, agent as registry_agent, agent_ids, needs_speaker, routing_lines
-from jarvis_core.voice import split_voice as _split_voice
+from jarvis_core.voice import NO_COURTESY_QUESTION, split_voice as _split_voice
 
 JARVIS_SECRET  = os.environ["JARVIS_SECRET"]
 ANTHROPIC_KEY  = os.environ["ANTHROPIC_API_KEY"]
@@ -549,7 +549,8 @@ def _build_routing_prompt(text, speaker, history, voice_mode=False, task_hint=No
         "Route to 'jarvis' only for greetings, small talk, or questions about Jarvis himself.\n"
         "Route to 'gemini_search' for general knowledge or current events questions.\n"
         "For everything else pick the most specific agent.\n"
-        + ("If agent is 'jarvis', write direct_response as one or two natural spoken sentences — no markdown.\n"
+        + ("If agent is 'jarvis', write direct_response as one or two natural spoken sentences — no markdown. "
+           + NO_COURTESY_QUESTION + "\n"
            if voice_mode else "") +
         "IMPORTANT: will_due is for ALL personal tasks and to-dos. andy_mann is ONLY for home maintenance tasks.\n"
         "If someone says 'add X to my to-do list' or 'add X to my task list' — always route to will_due.\n"
@@ -647,7 +648,8 @@ def _web_search(query, speaker, voice_mode=True):
 
         if _gemini_client is None:
             _gemini_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-        style = ("2-3 short spoken sentences. No markdown, no bullets, just natural speech"
+        style = ("2-3 short spoken sentences. No markdown, no bullets, just natural speech, "
+                 "and don't end with a question"
                  if voice_mode else "2-3 short sentences. No markdown, no bullets, just natural conversational text")
         response = _gemini_client.models.generate_content(
             model=os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite"),

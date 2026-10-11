@@ -15,8 +15,12 @@ and web questions on its own, and everything else through the
    "on it" chime plays.
 5. **Reply** — streamed from ElevenLabs straight to the speaker: it starts
    playing while the rest is still being generated.
-6. **Follow-up** — if Jarvis ends with a question ("want to hear the rest?",
-   "is that for Gio or Kenz?") the mic reopens for 4 s; no wake word needed.
+6. **Follow-up** — only when Jarvis asks something it needs answered ("want to
+   hear the rest?", "is that for Gio or Kenz?", "want me to text it to you?")
+   does the mic reopen for 4 s without the wake word. After statements and
+   courtesy questions ("anything else?") it goes straight back to waiting for
+   "Hey Jarvis", so it doesn't pick up conversations in the room
+   (`expects_reply` in `jarvis_core/voice.py`).
 
 Also built in:
 
