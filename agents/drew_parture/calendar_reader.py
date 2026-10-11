@@ -43,7 +43,17 @@ KNOWN_AIRPORTS = {
     "ATL","MIA","FLL","DEN","LAS","PHX","SEA","PDX","SLC",
     "BOS","IAD","DCA","BWI","SAN","OAK","SJC","SMF","BUR",
     "LGB","HNL","OGG","KOA","ITO","LIH","ANC","FAI","SNA",
-    "ONT","PSP","SBA","SBP","FAT","RNO","TUS","ABQ"
+    "ONT","PSP","SBA","SBP","FAT","RNO","TUS","ABQ",
+    "AUS","HOU","IAH","MSP","DTW","CLT","PHL","MCO","TPA",
+    "BNA","STL","MCI","RDU","MSY","SAT","PIT","BOI","GEG",
+    "ELP","EUG","MFR","BZN","JNU","SJU","MKE","IND","CMH"
+}
+
+# Spoken airline names by IATA code (events often say "AS 1234", not "Alaska")
+AIRLINE_NAMES = {
+    "DL": "Delta", "UA": "United", "AA": "American Airlines", "WN": "Southwest",
+    "B6": "JetBlue", "AS": "Alaska Airlines", "NK": "Spirit", "F9": "Frontier",
+    "HA": "Hawaiian Airlines", "SY": "Sun Country", "MX": "Breeze", "XP": "Avelo",
 }
 
 # Common city names in airline event titles → airport code (Southwest-heavy;
@@ -54,8 +64,30 @@ CITY_CODES = {
     "ontario": "ONT", "palm springs": "PSP", "sacramento": "SMF", "las vegas": "LAS",
     "phoenix": "PHX", "denver": "DEN", "seattle": "SEA", "portland": "PDX",
     "salt lake": "SLC", "honolulu": "HNL", "boston": "BOS", "atlanta": "ATL",
-    "miami": "MIA", "dallas": "DAL",
+    "miami": "MIA", "dallas": "DAL", "austin": "AUS", "nashville": "BNA",
+    "orlando": "MCO", "tampa": "TPA", "new orleans": "MSY", "san antonio": "SAT",
+    "minneapolis": "MSP", "detroit": "DTW", "charlotte": "CLT", "philadelphia": "PHL",
+    "st. louis": "STL", "saint louis": "STL", "kansas city": "MCI", "raleigh": "RDU",
+    "pittsburgh": "PIT", "boise": "BOI", "spokane": "GEG", "anchorage": "ANC",
+    "maui": "OGG", "kona": "KOA", "kauai": "LIH", "fort lauderdale": "FLL",
+    "baltimore": "BWI", "reno": "RNO", "tucson": "TUS", "albuquerque": "ABQ",
+    "el paso": "ELP", "fresno": "FAT", "santa barbara": "SBA", "eugene": "EUG",
+    "medford": "MFR", "bozeman": "BZN", "juneau": "JNU", "fairbanks": "FAI",
+    "milwaukee": "MKE", "indianapolis": "IND", "columbus": "CMH", "san juan": "SJU",
 }
+
+# Airport code → city, for speaking (voice replies never read out codes)
+AIRPORT_CITIES = {code: city.title() for city, code in CITY_CODES.items() if city != "saint louis"}
+AIRPORT_CITIES.update({
+    "JFK": "New York", "LGA": "New York", "EWR": "Newark", "ORD": "Chicago", "MDW": "Chicago",
+    "DFW": "Dallas", "IAD": "Washington", "DCA": "Washington", "HOU": "Houston", "IAH": "Houston",
+    "SBP": "San Luis Obispo", "ITO": "Hilo", "STL": "St. Louis",
+})
+
+
+def spoken_city(code):
+    """'Seattle' for 'SEA'; the code itself if unknown; '' for ''."""
+    return AIRPORT_CITIES.get(code, code) if code else ""
 
 
 def _destination_from_title(title):
@@ -158,40 +190,40 @@ def parse_flight_from_event(event):
     flight = dict()
     flight["title"] = title
 
-    # Flight number
-    flight_num_pattern = r'\b([A-Z]{2}|[A-Z][A-Z0-9])\s*(\d{1,4})\b'
-    match = re.search(flight_num_pattern, f"{title} {description}")
+    # Airline named in the text ("Alaska", "Delta"…), if any
+    named_code = next((code for name, code in AIRLINE_CODES.items() if name in full_text), None)
+
+    # Flight number: prefer the named airline's code ("AS 1234"), else any XX 1234
+    match = None
+    if named_code:
+        match = re.search(rf'\b({re.escape(named_code)})\s*(\d{{1,4}})\b', f"{title} {description}")
+    if not match:
+        match = re.search(r'\b([A-Z]{2}|[A-Z][A-Z0-9])\s*(\d{1,4})\b', f"{title} {description}")
     if match:
         flight["flight_number"] = f"{match.group(1)}{match.group(2)}"
         flight["airline_code"] = match.group(1)
     else:
         flight["flight_number"] = ""
-        flight["airline_code"] = ""
+        flight["airline_code"] = named_code or ""
 
-    # Airports
+    # Airports: "LAX → SEA" gives both; otherwise the destination comes from a
+    # code or city name ("Flight to Seattle"), and the origin stays blank
     airports = re.findall(r'\b([A-Z]{3})\b', f"{title} {description}")
     filtered = [a for a in airports if a in KNOWN_AIRPORTS]
     if len(filtered) >= 2:
         flight["origin"] = filtered[0]
         flight["destination"] = filtered[-1]
-    elif len(filtered) == 1:
-        flight["origin"] = filtered[0]
-        flight["destination"] = ""
     else:
         flight["origin"] = ""
-        flight["destination"] = ""
+        flight["destination"] = _destination_from_title(title) or _destination_from_title(description)
 
     # Confirmation
     conf_match = re.search(r'confirmation[^:]*:\s*([A-Z0-9]{5,8})', f"{title} {description}", re.IGNORECASE)
     flight["confirmation"] = conf_match.group(1) if conf_match else ""
 
-    # Airline name
-    for name, code in AIRLINE_CODES.items():
-        if name in full_text:
-            flight["airline_name"] = name.title()
-            break
-    else:
-        flight["airline_name"] = flight.get("airline_code", "")
+    # Airline name, spoken form ("Alaska Airlines", never just "AS")
+    code = named_code or flight["airline_code"]
+    flight["airline_name"] = AIRLINE_NAMES.get(code, code)
 
     # Times
     start = event.get("start", {})

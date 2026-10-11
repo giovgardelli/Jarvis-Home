@@ -60,23 +60,19 @@ def get_google_flights(origin, destination, date_str, max_retries=3):
         print(f"SerpApi response parsing error: {e}", flush=True)
         return None
 
-def get_southwest_price(origin, destination, date_str, flight_number):
-    """Get price for a specific Southwest flight number."""
+def _same_flight(serp_number, flight_number):
+    """'AS 1234' (SerpApi) vs 'AS1234' (calendar). A bare '1234' counts too."""
+    serp = (serp_number or "").replace(" ", "").upper()
+    want = flight_number.upper()
+    return serp == want or serp == want[2:]
+
+
+def get_flight_price(origin, destination, date_str, flight_number):
+    """Get the current price for a specific flight number (e.g. WN1234, AS1234)."""
     all_flights = get_google_flights(origin, destination, date_str)
     if not all_flights:
         return None
-    flight_num_clean = flight_number.replace("WN", "").strip()
     for f in all_flights:
-        if flight_num_clean in f.get("flight", "").replace(" ", ""):
+        if _same_flight(f.get("flight", ""), flight_number):
             return f.get("price")
     return None
-
-def get_cheapest_southwest(origin, destination, date_str):
-    """Get the cheapest Southwest flight for a route/date."""
-    all_flights = get_google_flights(origin, destination, date_str)
-    if not all_flights:
-        return None
-    sw_flights = [f for f in all_flights if "southwest" in f.get("airline", "").lower()]
-    if not sw_flights:
-        return None
-    return min(sw_flights, key=lambda x: x.get("price", 999))

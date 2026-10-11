@@ -4,7 +4,7 @@ from jarvis_core import llm
 import anthropic
 from datetime import datetime
 import pytz
-from calendar_reader import get_upcoming_flights
+from calendar_reader import get_upcoming_flights, spoken_city
 
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
@@ -21,7 +21,7 @@ Rules:
 - Always convert times to Pacific Time (PT)
 - If no flights are found, say so clearly
 - Format dates clearly e.g. "Monday May 25th"
-- Say morning/afternoon/evening instead of exact times unless asked
+- Always give the departure time (e.g. 7:45 AM) and the destination city
 - Never mention flight numbers or airport codes unless specifically asked"""
 
 SYSTEM_PROMPT_KENZ = """You are Drew Parture, a friendly flight tracking assistant for Kenz.
@@ -37,7 +37,7 @@ Rules:
 - Always convert times to Pacific Time (PT)
 - If no flights are found, say so clearly
 - Format dates clearly e.g. "Monday May 25th"
-- Say morning/afternoon/evening instead of exact times unless asked
+- Always give the departure time (e.g. 7:45 AM) and the destination city
 - Never mention flight numbers or airport codes unless specifically asked"""
 
 
@@ -93,34 +93,28 @@ def format_flight_spoken(flight, speaker="gio"):
     """Format a single flight for voice — no hallucination possible."""
     pt = pytz.timezone(TIMEZONE)
 
-    airline = flight.get("airline_name", "")
-    destination = flight.get("destination", "")
+    airline = flight.get("airline_name") or "your airline"
+    city = spoken_city(flight.get("destination", ""))
     dep_raw = flight.get("departure_time", "")
 
     try:
         dep = datetime.fromisoformat(dep_raw).astimezone(pt)
         days_away = (dep.date() - datetime.now(pt).date()).days
         if days_away == 0:
-            date_str = "today"
+            day = "today"
         elif days_away == 1:
-            date_str = "tomorrow"
+            day = "tomorrow"
         elif days_away <= 7:
-            date_str = dep.strftime("%A")
+            day = "on " + dep.strftime("%A")
         else:
-            date_str = dep.strftime("%B %-d")
-        hour = dep.hour
-        if hour < 12:
-            time_of_day = "morning"
-        elif hour < 17:
-            time_of_day = "afternoon"
-        else:
-            time_of_day = "evening"
-        date_str = f"{date_str} {time_of_day}"
+            day = "on " + dep.strftime("%B %-d")
+        when = f"{day} at {dep.strftime('%-I:%M %p')}"      # "on Tuesday at 7:45 AM"
     except Exception:
-        date_str = dep_raw
+        when = dep_raw
 
     pronoun = "Your" if speaker == "gio" else "Gio's"
-    return f"{pronoun} next flight is {airline} to {destination} {date_str}."
+    to_city = f" to {city}" if city else ""
+    return f"{pronoun} next flight is {airline}{to_city}, {when}."
 
 
 def _select_flight_for_timeframe(flights, user_message):
