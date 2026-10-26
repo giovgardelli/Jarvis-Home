@@ -19,7 +19,7 @@ use cloud AI because a Raspberry Pi can't do them fast enough yet.
 | **Wake word detection** (openWakeWord) — nothing is sent until "Hey Jarvis" | **Your spoken command** → Deepgram (speech-to-text) |
 | **Voice prints and voice ID** (Resemblyzer) — never uploaded | **The request text** → Anthropic (routing and replies) |
 | Timers, alarms, LEDs, keyword shortcuts | **Spoken replies** → ElevenLabs (text-to-speech) |
-| Conversation history and state (SQLite file) | **Web questions** → Google Gemini; **radio searches** → Radio Browser |
+| Conversation history and state (SQLite file) | **Web questions** → Google Gemini; **radio searches** → Radio Browser (and Anthropic for the closest genre) |
 | All API keys and secrets | **Lists and calendar** → your own Google Sheets / Calendar |
 | The agents themselves (localhost only) | **Telegram messages** → Telegram |
 

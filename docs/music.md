@@ -37,17 +37,33 @@ Then check:
 |---|---|
 | "play some jazz", "play the 80s station", "put on some chill music" | A preset from `stations.json` |
 | "play KEXP", "play BBC Radio 1", "play reggae" | Searched on Radio Browser: by station name, then by genre |
+| "play Taylor Swift", "play something upbeat" | No station for that: the closest genre instead (see below) |
 | "play the radio", "play some music", "resume" | The last station (the first preset the very first time) |
 | "stop", "pause", "turn off the radio" | Stops the radio |
 | "louder", "raise the volume", "quieter", "lower the volume", "reduce the volume", "it's too loud" | Radio volume, in steps. Kept across restarts. AirPlay volume stays on your phone |
 | "what's playing", "what song is this" | The title the station sends, if it sends one |
 
 These are keyword rules in the router, so they're instant and don't need a
-Claude call. Anyone in the room can use them, like timers. They work by voice
+Claude call (except finding the closest genre, below). Anyone in the room can use them, like timers. They work by voice
 only: over Telegram, Jarvis says to ask out loud.
 
-What radio *can't* do: play a specific song, album or artist ("play Taylor
-Swift" finds a fan station at best). Use AirPlay for that.
+### When radio can't play exactly what you asked
+
+Radio can't play a specific song, album or artist; for that, use AirPlay. A
+music request still never ends without music, and Jarvis doesn't ask a
+follow-up question. It tries, in order:
+
+1. **A preset** whose name or alias you said.
+2. **A Radio Browser station by name**: "play Taylor Swift" may find a fan
+   station, which is as close as it gets.
+3. **A Radio Browser station by genre tag**: "play reggae".
+4. **The closest genre**: one quick Claude call ("taylor swift" → pop,
+   country), then a preset or station for the first genre that has one.
+   Jarvis says so: *"Radio can't play taylor swift exactly, so here's Hits 1,
+   for some pop."*
+5. **Your last station** (or the first preset) when nothing is close, or the
+   internet is down: *"I couldn't find anything close to … so here's Groove
+   Salad."*
 
 ## Your stations
 
@@ -104,7 +120,8 @@ Jarvis's voice, timers, brief ──► ffmpeg | aplay ────────�
 - **Pausing on the phone** may keep AirPlay "active" for a little while.
   Jarvis keeps the radio off until the session ends.
 - **Privacy:** what you ask the radio to play is sent to Radio Browser as a
-  search when it isn't a preset. AirPlay is visible to everyone on your Wi-Fi
+  search when it isn't a preset, and to Anthropic when nothing matches (to
+  find the closest genre). AirPlay is visible to everyone on your Wi-Fi
   (not the internet), so anyone on it can play to the speaker. Add a password
   if that matters ([privacy-and-security.md](privacy-and-security.md)).
 
