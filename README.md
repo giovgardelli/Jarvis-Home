@@ -35,6 +35,7 @@ Telegram bot**, without the voice assistant.
 | **Drew Parture** | Flights from your Google Calendar: morning heads-up, delay, departure and landing alerts | Telegram, Google Calendar, AviationStack, Anthropic | [agents/drew_parture](agents/drew_parture/README.md) |
 | **Miles Ahead** | Watches your booked Southwest fares and alerts you when the price drops | Telegram, Google Calendar + Sheets, SerpApi | [agents/miles_ahead](agents/miles_ahead/README.md) |
 | **Jarvis (central)** | Telegram front door to all agents, 7am morning brief, model-update check | Telegram, Anthropic, Gemini | [agents/jarvis](agents/jarvis/README.md) |
+| **Music** *(optional)* | Free internet radio by voice ("play some jazz") and AirPlay from your phone; music turns down when you say "Hey Jarvis" | Voice assistant, `mpv`, `shairport-sync` (no accounts) | [docs/music.md](docs/music.md) |
 | **Voice ID** *(optional)* | Recognizes who's speaking and gates personal information | Voice assistant + a decent mic | [docs/voice-id.md](docs/voice-id.md) |
 
 ## Privacy and security, in short
@@ -76,6 +77,7 @@ replies, web questions — and how to keep more of it local is covered in
 | `registry.json` | The agents: endpoints, routing hints, sensitivity tier |
 | `household.json` | Who lives here: names and spellings speech-to-text might produce |
 | `agents/<name>/` | One agent per folder, each a small Flask app + Telegram bot (`pi_run.py`) |
+| `music_player.py`, `stations.json` | Radio and AirPlay ducking; radio presets |
 | `timer_manager.py`, `led_controller.py`, `voice_id.py`, `enroll.py` | Voice-loop helpers |
 | `deploy/` | Pi setup script, requirements, settings template, voice service file |
 | `tests/` | Test suite — standard library only: `python3 -m unittest discover -s tests -b` |

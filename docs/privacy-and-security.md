@@ -19,7 +19,7 @@ use cloud AI because a Raspberry Pi can't do them fast enough yet.
 | **Wake word detection** (openWakeWord) — nothing is sent until "Hey Jarvis" | **Your spoken command** → Deepgram (speech-to-text) |
 | **Voice prints and voice ID** (Resemblyzer) — never uploaded | **The request text** → Anthropic (routing and replies) |
 | Timers, alarms, LEDs, keyword shortcuts | **Spoken replies** → ElevenLabs (text-to-speech) |
-| Conversation history and state (SQLite file) | **Web questions** → Google Gemini |
+| Conversation history and state (SQLite file) | **Web questions** → Google Gemini; **radio searches** → Radio Browser |
 | All API keys and secrets | **Lists and calendar** → your own Google Sheets / Calendar |
 | The agents themselves (localhost only) | **Telegram messages** → Telegram |
 
@@ -32,7 +32,10 @@ data or keep it longer than needed.
 **1. No doors into your home.** The Telegram bots *poll* Telegram for new
 messages instead of receiving webhooks, so you never open a port or expose a
 URL. Each agent's web server listens on `127.0.0.1` only — reachable from the
-Pi itself, not from your network, let alone the internet.
+Pi itself, not from your network, let alone the internet. The one exception is
+optional: [AirPlay](music.md) makes the speaker visible on your home Wi-Fi
+(still not the internet), so anyone on it can play music to it. Set an AirPlay
+password if that matters.
 
 **2. Agents only trust Jarvis.** Requests between Jarvis and the agents carry
 a shared secret (`JARVIS_SECRET`); anything without it is refused.

@@ -17,6 +17,14 @@ TIMEZONE = os.environ.get("JARVIS_TIMEZONE", "America/Los_Angeles")
 AUDIO_OUT_DEVICE = os.environ.get("JARVIS_AUDIO_OUT", "hw:2,0")
 MIC_NAME = os.environ.get("JARVIS_MIC_NAME", "EMEET")
 
+# What Jarvis's own sounds are played through. Defaults to the speaker itself;
+# deploy/setup_music.sh sets it to "jarvis", a mixing device on that speaker,
+# so speech, the radio and AirPlay can play at the same time (docs/music.md).
+PLAYBACK_DEVICE = os.environ.get("JARVIS_PLAYBACK", AUDIO_OUT_DEVICE)
+
+# Created by shairport-sync's hooks while an AirPlay stream is playing
+AIRPLAY_FLAG = os.environ.get("JARVIS_AIRPLAY_FLAG", "/dev/shm/jarvis-airplay")
+
 # Voice ID (who is speaking). Off for now: the current far-field mic isn't
 # accurate enough. While off, every voice command is treated as
 # JARVIS_SPEAKER (default "gio"). To turn it back on, see README.md →

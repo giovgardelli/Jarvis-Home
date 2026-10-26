@@ -146,6 +146,9 @@ set -a && source ~/.jarvis_env && set +a && ~/jarvis-env/bin/python agents/jarvi
 Any short mp3s named `on_it.mp3`, `one_moment.mp3`, `let_me_check.mp3`,
 `looking_into_that.mp3` and `right_away.mp3` in `~/acks/` work too.
 
+**Optional: music.** Radio by voice and AirPlay from your phone. One script,
+no accounts: `bash deploy/setup_music.sh`. See [music.md](music.md).
+
 ## 9. Check it works
 
 - Say **"Hey Jarvis, what time is it"** (no agents involved)

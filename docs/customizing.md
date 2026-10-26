@@ -13,6 +13,7 @@ to "edit a prompt".
 | Microphone and speaker | `JARVIS_MIC_NAME`, `JARVIS_AUDIO_OUT` |
 | Where runtime files live | `JARVIS_HOME` (default: your home folder) |
 | Web-answer model | `GEMINI_MODEL` |
+| Radio presets ("play some jazz") | `stations.json` — see [music.md](music.md) |
 | Voice ID on/off and thresholds | `VOICE_ID_ENABLED`, `VOICE_ID_CONFIRMED`, `VOICE_ID_UNCERTAIN` — see [voice-id.md](voice-id.md) |
 
 `household.json` example:

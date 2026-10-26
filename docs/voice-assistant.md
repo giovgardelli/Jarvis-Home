@@ -27,6 +27,9 @@ Also built in:
 - **Timers and alarms** — "set a pasta timer for 10 minutes", "wake me up at
   7:30", "cancel my alarm". They survive restarts; one that went off during a
   restart is announced late instead of lost.
+- **Music** — free internet radio ("play some jazz", "louder", "stop") and
+  AirPlay from your phone. The music turns down as soon as you say "Hey
+  Jarvis" and comes back up after the answer. Optional: [music.md](music.md).
 - **Morning brief** — the central service builds it at 7:00; the speaker
   fetches it and plays it when you say "good morning" or "what's my brief".
 - **"Text me that"** — sends the full version of the last answer to Telegram.
@@ -56,6 +59,7 @@ Setup: [setup.md](setup.md) steps 2, 5 and 8. Keys: `ANTHROPIC_API_KEY`,
 | Quiet mic / far away | The 3x boost in `prepare_audio()` (re-enroll voice ID if you change it) |
 | Better recognition of your words | Add to the `keyterm` list in `transcribe()`; names come from `household.json` |
 | A different voice | `ELEVENLABS_VOICE_ID` |
+| Music quieter or louder while Jarvis listens | `DUCK_RATIO` in `music_player.py` ([music.md](music.md)) |
 | Different chimes | Replace the mp3s in `~/acks/` |
 
 The loop saves one short audio sample per near-miss wake word to

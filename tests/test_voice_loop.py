@@ -67,7 +67,8 @@ class MainLoopRecovery(unittest.TestCase):
         jp = voice_loop()
         saved = {k: getattr(jp, k) for k in ("Model", "wakeword_model_path", "find_audio_device", "_open_stream", "_handle_command",
                                              "_apologize", "_reopen_audio", "SAMPLE_RATE", "CHUNK",
-                                             "WAKEWORD_SAMPLES_DIR", "WAKEWORD_MAX_SAMPLES", "timer_manager")}
+                                             "WAKEWORD_SAMPLES_DIR", "WAKEWORD_MAX_SAMPLES", "timer_manager",
+                                             "music_player")}
         samples_dir = tempfile.mkdtemp()
         events = []
         # per-chunk wake scores: near-miss event, failed command, mic error, good command, 2 near-misses
@@ -100,9 +101,12 @@ class MainLoopRecovery(unittest.TestCase):
 
         calls = {"n": 0}
 
+        music = []
+
         def handle(p, device, t0):
             calls["n"] += 1
             events.append(f"command {calls['n']}")
+            music.append("command")
             if calls["n"] == 1:
                 raise ConnectionError("Deepgram unreachable")
 
@@ -118,11 +122,16 @@ class MainLoopRecovery(unittest.TestCase):
             jp.SAMPLE_RATE = jp.CHUNK = 1024           # 1 chunk = "1 second": short warm-ups
             jp.WAKEWORD_SAMPLES_DIR, jp.WAKEWORD_MAX_SAMPLES = samples_dir, 3
             jp.timer_manager = types.SimpleNamespace(init=lambda **k: None)
+            jp.music_player = types.SimpleNamespace(init=lambda: music.append("init"),
+                                                    duck=lambda: music.append("duck"),
+                                                    unduck=lambda: music.append("unduck"))
             jp.main()
         finally:
             for k, v in saved.items():
                 setattr(jp, k, v)
         self.assertEqual(events, ["command 1", "apologized", "mic reopened", "command 2"])
+        # music down from the wake word to the end of the exchange, even when it failed
+        self.assertEqual(music, ["init", "duck", "command", "unduck", "duck", "command", "unduck"])
         kept = os.listdir(samples_dir)
         self.assertEqual(len(kept), 3, "one sample per event, capped")
         shutil.rmtree(samples_dir)
@@ -182,6 +191,31 @@ class CommandFlow(unittest.TestCase):
             self.assertLessEqual(dict((x, t) for t, x in log)["speak: Added dentist to your list."], 0.7)
         finally:
             jp.__dict__.update(saved)
+
+
+class MusicDucking(unittest.TestCase):
+    def test_every_jarvis_sound_turns_the_music_down(self):
+        jp = voice_loop()
+        log = []
+
+        class Ducked:
+            def __enter__(self):
+                log.append("down")
+
+            def __exit__(self, *exc):
+                log.append("up")
+        saved = (jp.music_player, jp._to_speaker_locked)
+        jp.music_player = types.SimpleNamespace(ducked=Ducked)
+        jp._to_speaker_locked = lambda args, feed: log.append("sound")
+        try:
+            jp.play_file("timer.mp3")
+        finally:
+            jp.music_player, jp._to_speaker_locked = saved
+        self.assertEqual(log, ["down", "sound", "up"])
+
+    def test_sounds_go_to_the_playback_device(self):
+        jp = voice_loop()
+        self.assertEqual(jp.APLAY_CMD[-1], jp.PLAYBACK_DEVICE)
 
 
 class VoiceIdSwitch(unittest.TestCase):

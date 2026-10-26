@@ -1,0 +1,16 @@
+{
+  "_comment": "Radio presets for the speaker (music_player.py). Say a name or any alias: \"play groove salad\", \"play some jazz\". Anything not listed here is searched on Radio Browser (radio-browser.info), so \"play KEXP\" works without an entry. url can be a stream or a .pls/.m3u playlist. The first station is the default for \"play some music\" until another one has been played. These are SomaFM's free, listener-supported stations (somafm.com).",
+  "stations": [
+    {"name": "Groove Salad", "aliases": ["chill", "chillout", "ambient", "relaxing", "downtempo", "lounge", "background"], "url": "https://somafm.com/groovesalad.pls"},
+    {"name": "Sonic Universe", "aliases": ["jazz", "smooth jazz"], "url": "https://somafm.com/sonicuniverse.pls"},
+    {"name": "Left Coast 70s", "aliases": ["70s", "seventies", "classic rock"], "url": "https://somafm.com/seventies.pls"},
+    {"name": "Underground 80s", "aliases": ["80s", "eighties", "new wave"], "url": "https://somafm.com/u80s.pls"},
+    {"name": "Indie Pop Rocks", "aliases": ["indie", "indie pop", "indie rock"], "url": "https://somafm.com/indiepop.pls"},
+    {"name": "Boot Liquor", "aliases": ["country", "americana"], "url": "https://somafm.com/bootliquor.pls"},
+    {"name": "Folk Forward", "aliases": ["folk", "acoustic"], "url": "https://somafm.com/folkfwd.pls"},
+    {"name": "Beat Blender", "aliases": ["electronic", "house", "deep house"], "url": "https://somafm.com/beatblender.pls"},
+    {"name": "Secret Agent", "aliases": ["spy", "cocktail"], "url": "https://somafm.com/secretagent.pls"},
+    {"name": "Drone Zone", "aliases": ["sleep", "focus", "meditation", "study"], "url": "https://somafm.com/dronezone.pls"},
+    {"name": "Christmas Lounge", "aliases": ["christmas", "holiday", "christmas music"], "url": "https://somafm.com/christmas.pls"}
+  ]
+}

@@ -10,6 +10,7 @@ worth borrowing.
 request
   ├─ "text me that" / "tell me more"          → replay the last answer
   ├─ timer / alarm / time                     → handled on the Pi (voice only)
+  ├─ music: play / stop / louder / what's on  → the radio on the Pi (voice only)
   ├─ "what are my priorities"                 → ask several agents in parallel, merge
   ├─ explicit web search ("search for…")      → Gemini with Google Search
   ├─ unambiguous shortcut (shopping, flights) → that agent, no AI call
