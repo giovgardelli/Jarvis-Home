@@ -39,7 +39,7 @@ Then check:
 | "play KEXP", "play BBC Radio 1", "play reggae" | Searched on Radio Browser: by station name, then by genre |
 | "play the radio", "play some music", "resume" | The last station (the first preset the very first time) |
 | "stop", "pause", "turn off the radio" | Stops the radio |
-| "louder", "turn it up", "quieter", "turn the volume down" | Radio volume, in steps. Kept across restarts |
+| "louder", "raise the volume", "quieter", "lower the volume", "reduce the volume", "it's too loud" | Radio volume, in steps. Kept across restarts. AirPlay volume stays on your phone |
 | "what's playing", "what song is this" | The title the station sends, if it sends one |
 
 These are keyword rules in the router, so they're instant and don't need a

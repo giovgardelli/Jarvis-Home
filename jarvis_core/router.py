@@ -258,6 +258,12 @@ MUSIC_DOWN_TRIGGERS = [
     "turn down the radio", "turn the radio down", "volume down", "turn down the volume",
     "turn the volume down", "lower the volume", "lower the music"
 ]
+# ...or a volume verb with a volume noun: "reduce the volume", "raise the music"
+VOLUME_NOUNS = ["volume", "music", "radio", "sound", "speaker"]
+VOLUME_UP_VERBS = ["raise", "increase", "boost", "turn up", "pump up", "bump up"]
+VOLUME_DOWN_VERBS = ["reduce", "decrease", "lower", "turn down", "drop"]
+VOLUME_UP_EXACT = ["raise it", "increase it", "a bit louder", "too quiet", "it's too quiet", "i can't hear it"]
+VOLUME_DOWN_EXACT = ["lower it", "reduce it", "decrease it", "too loud", "it's too loud", "not so loud"]
 MUSIC_NOW_EXACT = ["what's playing", "whats playing", "what is playing", "what's on", "what is this"]
 MUSIC_NOW_TRIGGERS = [
     "this song", "song is this", "song is playing", "who sings this", "this station",
@@ -410,9 +416,11 @@ def _music_intent(text):
         return ("stop", "")
     if t in MUSIC_RESUME_EXACT or (_contains(t, ["resume", "unpause"]) and _contains(t, MUSIC_NOUNS)):
         return ("resume", "")
-    if _contains(t, MUSIC_UP_TRIGGERS):
+    if (_contains(t, MUSIC_UP_TRIGGERS) or t in VOLUME_UP_EXACT
+            or (_contains(t, VOLUME_UP_VERBS) and _contains(t, VOLUME_NOUNS))):
         return ("up", "")
-    if _contains(t, MUSIC_DOWN_TRIGGERS):
+    if (_contains(t, MUSIC_DOWN_TRIGGERS) or t in VOLUME_DOWN_EXACT
+            or (_contains(t, VOLUME_DOWN_VERBS) and _contains(t, VOLUME_NOUNS))):
         return ("down", "")
     if t in MUSIC_NOW_EXACT or _contains(t, MUSIC_NOW_TRIGGERS):
         return ("now", "")
