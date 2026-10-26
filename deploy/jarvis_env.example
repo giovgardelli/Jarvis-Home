@@ -25,6 +25,8 @@ GEMINI_API_KEY=               # web-search answers (also used by the model check
 # JARVIS_SPEAKER=                  # default person (else household.json default_speaker)
 # JARVIS_MIC_NAME=EMEET            # part of your microphone's device name
 # JARVIS_AUDIO_OUT=hw:2,0          # speaker device for aplay (see `aplay -l`)
+# JARVIS_PLAYBACK=jarvis           # set by deploy/setup_music.sh: the speaker shared with radio/AirPlay
+# JARVIS_AIRPLAY_FLAG=/dev/shm/jarvis-airplay   # exists while AirPlay plays (docs/music.md)
 # JARVIS_WAKEWORD_MODEL=           # path to a custom openWakeWord model
 
 # Claude model for every call — see docs/hardware-and-costs.md ("Models")

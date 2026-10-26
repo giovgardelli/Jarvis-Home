@@ -6,6 +6,7 @@ Telegram service (agents/jarvis, channel="telegram"). Order of checks:
 
   1. "text me that" / "hear more"  — replay the last full answer
   2. timers and alarms             — voice only (Telegram can't ring)
+     music (radio, volume, stop)   — voice only, keyword rules (music_player.py)
   3. multi-agent questions         — ask Will Due + Andy Mann in parallel, merge
   4. explicit web searches         — Gemini with Google Search
   5. unambiguous shortcuts         — shopping list, flights
@@ -47,6 +48,18 @@ def _timers():
         import timer_manager as tm
         timer_manager = tm
     return timer_manager
+
+
+# Imported on first use too: the radio plays on the Pi speaker
+music_player = None
+
+
+def _music():
+    global music_player
+    if music_player is None:
+        import music_player as mp
+        music_player = mp
+    return music_player
 
 
 def _address(speaker):
@@ -230,6 +243,32 @@ TIMER_LIST_TRIGGERS = [
     "do i have any timers", "timers running"
 ]
 
+# Music — keyword rules only, so "stop" or "louder" is instant (no Claude call)
+MUSIC_NOUNS = ["music", "radio", "station", "song", "songs", "tunes", "playlist"]
+# The whole utterance: "stop" alone means the music (timers need "timer")
+MUSIC_STOP_EXACT = ["stop", "pause", "stop it", "pause it", "stop playing", "be quiet", "silence"]
+MUSIC_STOP_VERBS = ["stop", "pause", "turn off", "shut off", "kill"]
+MUSIC_RESUME_EXACT = ["resume", "unpause", "play", "keep playing", "resume playing"]
+MUSIC_UP_TRIGGERS = [
+    "louder", "turn it up", "turn up the music", "turn the music up", "turn up the radio",
+    "turn the radio up", "volume up", "turn up the volume", "turn the volume up", "crank it up"
+]
+MUSIC_DOWN_TRIGGERS = [
+    "quieter", "softer", "turn it down", "turn down the music", "turn the music down",
+    "turn down the radio", "turn the radio down", "volume down", "turn down the volume",
+    "turn the volume down", "lower the volume", "lower the music"
+]
+MUSIC_NOW_EXACT = ["what's playing", "whats playing", "what is playing", "what's on", "what is this"]
+MUSIC_NOW_TRIGGERS = [
+    "this song", "song is this", "song is playing", "who sings this", "this station",
+    "station is this", "what are we listening to"
+]
+# "play ..." at the start; other verbs only with a music noun ("turn on the radio",
+# not "turn on the lights"). "play my brief" is handled before routing.
+MUSIC_PLAY_RE = re.compile(r"^(?:(?:hey )?jarvis,? |please |can you |could you |would you |will you )*"
+                           r"(play|put on|listen to|turn on|start)\b(.*)$")
+MUSIC_NOT_PLAY = ["brief", "briefing", "game", "voicemail", "message", "timer", "alarm"]
+
 # "the list" on its own means the shopping list (house convention);
 # to-do and maintenance lists are always named explicitly.
 SHOPPING_WRITE_TRIGGERS = [
@@ -362,6 +401,33 @@ def _is_timer_cancel(text):
 def _is_timer_list(text):
     return _contains(text, TIMER_LIST_TRIGGERS)
  
+def _music_intent(text):
+    """(action, query) for a music command, else None. Actions: play, resume,
+    stop, up, down, now. query is what to play ("" = the last station)."""
+    t = re.sub(r"[.!?,]+$", "", _normalize(text)).strip()
+    t = re.sub(r"^(?:(?:hey )?jarvis,? |please )+", "", t)
+    if t in MUSIC_STOP_EXACT or (_contains(t, MUSIC_STOP_VERBS) and _contains(t, MUSIC_NOUNS)):
+        return ("stop", "")
+    if t in MUSIC_RESUME_EXACT or (_contains(t, ["resume", "unpause"]) and _contains(t, MUSIC_NOUNS)):
+        return ("resume", "")
+    if _contains(t, MUSIC_UP_TRIGGERS):
+        return ("up", "")
+    if _contains(t, MUSIC_DOWN_TRIGGERS):
+        return ("down", "")
+    if t in MUSIC_NOW_EXACT or _contains(t, MUSIC_NOW_TRIGGERS):
+        return ("now", "")
+    m = MUSIC_PLAY_RE.match(t)
+    if m and not _contains(t, MUSIC_NOT_PLAY):
+        verb, rest = m.group(1), m.group(2).strip()
+        if verb == "play" or _contains(t, MUSIC_NOUNS) or rest.startswith("some "):
+            return ("play", rest)
+    return None
+
+
+def _is_music_request(text):
+    return _music_intent(text) is not None
+
+
 def _is_timer_request(text):
     return any([
         _is_time_query(text),
@@ -636,6 +702,25 @@ def _handle_timer(text: str) -> str:
         print(f"[Router] Timer error: {e}", flush=True)
         return "Something went wrong with the timer. Please try again."
  
+def _handle_music(text: str) -> str:
+    """Handle radio commands (voice only). Returns the spoken response; "" says nothing."""
+    try:
+        mp = _music()
+        action, query = _music_intent(text)
+        if action == "play":
+            return mp.play(query)
+        if action == "resume":
+            return mp.play("")
+        if action == "stop":
+            return mp.stop()
+        if action in ("up", "down"):
+            return mp.change_volume(action)
+        return mp.now_playing()
+    except Exception as e:
+        print(f"[Router] Music error: {e}", flush=True)
+        return "Something went wrong with the music. Please try again."
+
+
 # ── Web search ────────────────────────────────────────────────────────────────
 _gemini_client = None
 
@@ -882,6 +967,16 @@ def route(text, speaker, history=None, last_full=None, voice_mode=True,
                         "full_response": None, "force_text": False}
             response_text = _handle_timer(text)
             return {"response_text": response_text, "full_response": response_text, "force_text": False}
+
+        # Music plays on the Pi speaker only
+        if _is_music_request(text):
+            if channel != "voice":
+                return {"response_text": "Music plays on the speaker — just ask me out loud.",
+                        "full_response": None, "force_text": False}
+            print("[Router] Music command", flush=True)
+            _log_routing_decision(text, "music", "local")
+            response_text = _handle_music(text)
+            return {"response_text": response_text, "full_response": None, "force_text": False}
 
         # Multi-agent fan-out — both agents asked at the same time
         # (only agents present in registry.json — some installs skip one)

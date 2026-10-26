@@ -11,6 +11,7 @@ import requests
 import pyaudio
 import numpy as np
 import timer_manager
+import music_player
 import led_controller as led
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -24,7 +25,7 @@ from voice_id import warmup as voice_id_warmup
 if VOICE_ID_ENABLED:
     voice_id_warmup()  # loads the voice model (skipped entirely while voice ID is off)
 from concurrent.futures import ThreadPoolExecutor
-from jarvis_core.config import AUDIO_OUT_DEVICE, MIC_NAME, home_path, wakeword_model_path
+from jarvis_core.config import PLAYBACK_DEVICE, MIC_NAME, home_path, wakeword_model_path
 from jarvis_core import household
 PEOPLE_KEYTERMS = [f"{name}:5" for name in household.keyterms()]
 _executor = ThreadPoolExecutor(max_workers=2)
@@ -107,7 +108,7 @@ def find_audio_device(name_fragment: str) -> int:
 
 
 TTS_KWARGS = dict(model_id="eleven_flash_v2_5", output_format="mp3_44100_128")
-APLAY_CMD = ["aplay", "-r", "48000", "-f", "S16_LE", "-c", "2", "-D", AUDIO_OUT_DEVICE]
+APLAY_CMD = ["aplay", "-r", "48000", "-f", "S16_LE", "-c", "2", "-D", PLAYBACK_DEVICE]
 ACK_FILES = [home_path("acks", f) for f in
              ("on_it.mp3", "one_moment.mp3", "let_me_check.mp3", "looking_into_that.mp3", "right_away.mp3")]
 
@@ -120,16 +121,18 @@ def synthesize(text: str) -> bytes:
     return b"".join(audio)
 
 
-# One sound at a time: the speaker device (hw:2,0) can't be shared, so a timer
-# going off mid-reply now waits for the reply to finish instead of failing.
+# One Jarvis sound at a time: a timer going off mid-reply waits for the reply
+# to finish (on a raw hw: speaker it would fail; on the "jarvis" mixing device
+# the two would talk over each other). Music keeps playing, turned down.
 _speaker_lock = threading.Lock()
 
 
 def _to_speaker(input_args, feed=None):
     """Decode audio with ffmpeg (resampled to the speaker's 48kHz stereo) and
     pipe it straight into aplay. `feed` is an iterable of MP3 chunks written
-    to ffmpeg's stdin as they arrive; without it ffmpeg reads input_args."""
-    with _speaker_lock:
+    to ffmpeg's stdin as they arrive; without it ffmpeg reads input_args.
+    Music is turned down while it plays (timers and the brief included)."""
+    with music_player.ducked(), _speaker_lock:
         _to_speaker_locked(input_args, feed)
 
 
@@ -289,6 +292,8 @@ def transcribe(audio_bytes: bytes) -> str:
         "language": "en",
         "smart_format": True,
         "keyterm": [
+            # Music
+            "radio:4", "music:4", "louder:4", "quieter:4",
             # Commands
             "add:5", "remove:5", "delete:5", "mark:5", "complete:5",
             "create:5", "cancel:5", "update:5", "check:5", "refresh:5",
@@ -654,6 +659,7 @@ def main():
         play_fn=play_audio_bytes,
         synthesize_fn=synthesize
     )
+    music_player.init()
 
     print("Loading wake word model...", flush=True)
     oww_model = Model(wakeword_model_paths=[wakeword_model_path()])
@@ -724,13 +730,17 @@ def main():
                 stream.close()
 
                 # One failed request (network blip, API error) must not take
-                # Jarvis down: apologize and go back to listening
+                # Jarvis down: apologize and go back to listening.
+                # Music stays turned down until the whole exchange is over.
+                music_player.duck()
                 try:
                     _handle_command(p, audio_device, time.time())
                 except Exception as e:
                     print(f"[Error] Command failed: {e}", flush=True)
                     print(traceback.format_exc(), flush=True)
                     _apologize()
+                finally:
+                    music_player.unduck()
                 try:
                     stream = _resume_listening(p, audio_device, oww_model)
                 except Exception as e:

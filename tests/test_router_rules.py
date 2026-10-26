@@ -14,6 +14,8 @@ def classify(r, text, last_full=OFFERED_MORE):
         return "hear_more"
     if r._is_timer_request(text):
         return "timer"
+    if r._is_music_request(text):
+        return "music:" + r._music_intent(text)[0]
     if r._is_multi_agent(text):
         return "multi"
     if r._is_web_search(text):
@@ -48,6 +50,31 @@ CASES = {
     "stop all alarms": "timer",
     "set a timer for 10 minutes": "timer",
     "what time is it": "timer",
+    # music: keyword rules, voice only
+    "play some jazz": "music:play",
+    "Play KEXP.": "music:play",
+    "hey jarvis play the radio": "music:play",
+    "put on some music": "music:play",
+    "turn on the radio": "music:play",
+    "listen to some jazz": "music:play",
+    "can you play groove salad": "music:play",
+    "stop": "music:stop",
+    "Stop.": "music:stop",
+    "pause the music": "music:stop",
+    "turn off the radio": "music:stop",
+    "stop the alarm": "timer",
+    "resume": "music:resume",
+    "resume the music": "music:resume",
+    "turn it up": "music:up",
+    "louder": "music:up",
+    "turn the volume down": "music:down",
+    "what song is this": "music:now",
+    "what's playing": "music:now",
+    "turn on the lights": "haiku",
+    "start a timer for 5 minutes": "timer",
+    "play my brief": "haiku",
+    "what's playing at the movies": "haiku",
+    "I love this song": "music:now",
     # multi-agent read questions, never for writes
     "what's my priority for today": "multi",
     "update my address today": "haiku",
