@@ -4,6 +4,8 @@ music_player.py — internet radio and AirPlay on the Jarvis speaker.
 Radio plays through mpv, which can change its volume while it plays and read
 the song title a station sends. Stations come from stations.json (presets)
 or Radio Browser (radio-browser.info: a free, open directory, no account).
+A request radio can't play exactly ("play Taylor Swift") gets the closest
+genre, picked by Claude — a music request always ends with music playing.
 
 AirPlay is shairport-sync, a separate service (deploy/setup_music.sh). This
 module only notices it — the service's hooks create AIRPLAY_FLAG while a
@@ -25,6 +27,7 @@ from contextlib import contextmanager
 
 import requests
 
+from jarvis_core import llm
 from jarvis_core.config import AIRPLAY_FLAG, AUDIO_OUT_DEVICE, PLAYBACK_DEVICE, home_path
 
 STATIONS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stations.json")
@@ -124,18 +127,81 @@ def _radio_browser(**params):
     return []
 
 
-def search(query):
+def _as_station(preset):
+    return {"name": preset["name"], "url": preset["url"]}
+
+
+def search(query, fields=("name", "tag")):
     """A station for the query: a preset, else Radio Browser by name, then by
     genre tag. None if nothing was found."""
     preset = find_preset(query)
     if preset:
-        return {"name": preset["name"], "url": preset["url"]}
-    for field in ("name", "tag"):
+        return _as_station(preset)
+    for field in fields:
         for found in _radio_browser(**{field: query}):
             url = found.get("url_resolved") or found.get("url")
             if url:
                 return {"name": " ".join(found.get("name", query).split()), "url": url}
     return None
+
+
+GENRE_SCHEMA = {
+    "type": "object",
+    "properties": {"genres": {"type": "array", "items": {"type": "string"}}},
+    "required": ["genres"],
+    "additionalProperties": False,
+}
+_claude = None
+
+
+def closest_genres(query):
+    """Radio genres closest to a request radio can't play exactly, closest
+    first ("taylor swift" → ["pop", "country"]). [] if Claude can't be asked."""
+    global _claude
+    try:
+        import anthropic
+        if _claude is None:
+            _claude = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"], timeout=10)
+        known = sorted({a for s in presets() for a in s.get("aliases", [])})
+        resp = _claude.messages.create(
+            model=llm.MODEL,
+            max_tokens=100,
+            messages=[{"role": "user", "content": (
+                f'Someone asked a home speaker to play "{query}". It can only play internet '
+                "radio stations, found by genre tag (e.g. pop, rock, jazz, country, hip hop, "
+                "classical, 80s, chill). List up to 3 common genre tags whose stations would "
+                "sound closest to the request, closest first. Lowercase, no explanations. "
+                f"Use one of these where it fits well: {', '.join(known)}."
+            )}],
+            extra_body=llm.fast({"output_config": {"format": {"type": "json_schema", "schema": GENRE_SCHEMA}}}),
+        )
+        genres = [g.strip().lower() for g in json.loads(llm.text(resp))["genres"] if g.strip()]
+        print(f"[Music] Closest to {query!r}: {genres}", flush=True)
+        return genres[:3]
+    except Exception as e:
+        print(f"[Music] Closest-genre lookup failed: {e}", flush=True)
+        return []
+
+
+def default_station():
+    """What "play some music" plays: the last station, else the first preset."""
+    return _last["station"] or _as_station(presets()[0])
+
+
+def find(query):
+    """(station, how) for a request — always a station, never None:
+      "exact"    a preset or a Radio Browser station matching the words
+      "closest"  the nearest genre to something radio can't play exactly
+      "fallback" nothing close found (or no internet): the default station
+    For "closest", how is ("closest", genre)."""
+    station = search(query)
+    if station:
+        return station, "exact"
+    for genre in closest_genres(query):
+        station = search(genre, fields=("tag",))
+        if station:
+            return station, ("closest", genre)
+    return default_station(), "fallback"
 
 
 # ── State ─────────────────────────────────────────────────────────────────────
@@ -299,20 +365,18 @@ def play(query):
     if airplay_active():
         return "Something's playing over AirPlay right now. Pause it on your phone, then ask me again."
     query = clean_query(query)
-    if query:
-        station = search(query)
-        if station is None:
-            return (f"I couldn't find a radio station for {query}. "
-                    "Try a genre like jazz or a station name — or play it from your phone over AirPlay.")
-    else:
-        station = _last["station"] or {k: presets()[0][k] for k in ("name", "url")}
+    station, how = find(query) if query else (default_station(), "exact")
     with _lock:
         _kill_mpv()
         _mpv = _start_mpv(station["url"], _current_volume())
         _station, _last_start = station, time.time()
         _last["station"] = station
         _save_state()
-    print(f"[Music] Playing {station['name']} ({station['url']})", flush=True)
+    print(f"[Music] Playing {station['name']} ({station['url']}) — {how}", flush=True)
+    if how == "fallback":
+        return f"I couldn't find anything close to {query} on the radio, so here's {station['name']}."
+    if how != "exact":
+        return f"Radio can't play {query} exactly, so here's {station['name']}, for some {how[1]}."
     return f"Playing {station['name']}."
 
 

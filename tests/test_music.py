@@ -61,8 +61,9 @@ class Music(unittest.TestCase):
             self.searches.append(params)
             return self.found.get(tuple(params.items())[0], [])
 
-        self.metadata, self.found = {}, {}
+        self.metadata, self.found, self.genres = {}, {}, {}
         mp._start_mpv, mp._ipc, mp._radio_browser = start, ipc, radio_browser
+        mp.closest_genres = lambda q: self.genres.get(q, [])
         mp.subprocess.run = lambda cmd, **k: self.amixer.append(cmd[-1])
 
     def airplay(self, on):
@@ -91,7 +92,42 @@ class Music(unittest.TestCase):
         self.assertEqual([list(s)[0] for s in self.searches], ["name", "tag"])
         self.assertEqual(self.started[-1].url, "http://r/141")
         self.assertEqual(self.started[0].exit, 0, "the previous station was stopped")
-        self.assertIn("couldn't find a radio station for taylor swift", mp.play("Taylor Swift"))
+
+    def test_unplayable_request_gets_the_closest_genre(self):
+        mp = self.mp
+        self.genres = {"taylor swift": ["pop", "country"], "something upbeat": ["smooth jazz", "dance"]}
+        self.found = {("tag", "pop"): [{"name": "Hits 1", "url_resolved": "http://r/hits"}]}
+        self.assertEqual(mp.play("Taylor Swift"), "Radio can't play taylor swift exactly, so here's Hits 1, for some pop.")
+        self.assertEqual(self.started[-1].url, "http://r/hits")
+        self.assertEqual(mp.play("something upbeat"),
+                         "Radio can't play something upbeat exactly, so here's Sonic Universe, for some smooth jazz.",
+                         "a genre that is a preset alias plays the preset")
+
+    def test_nothing_close_still_plays_music(self):
+        mp = self.mp
+        mp.play("80s")
+        self.assertEqual(mp.play("Shake It Off"),
+                         "I couldn't find anything close to shake it off on the radio, so here's Underground 80s.")
+        self.assertTrue(mp.is_playing(), "never a dead end: the last station plays")
+
+    def test_closest_genres_asks_claude_once_and_fails_quietly(self):
+        mp = fresh_player(self.tmp)
+        sent = []
+
+        class Messages:
+            def create(self, **kw):
+                sent.append(kw)
+                if kw["messages"][0]["content"].startswith("Someone asked a home speaker to play \"boom\""):
+                    raise RuntimeError("Anthropic unreachable")
+                block = type("B", (), {"type": "text", "text": '{"genres": ["Pop", " Country ", "", "folk", "rock"]}'})
+                return type("R", (), {"content": [block], "stop_reason": "end_turn"})
+        mp._claude = type("C", (), {"messages": Messages()})()
+        self.assertEqual(mp.closest_genres("taylor swift"), ["pop", "country", "folk"])
+        prompt = sent[0]["messages"][0]["content"]
+        self.assertIn('"taylor swift"', prompt)
+        self.assertIn("smooth jazz", prompt, "preset aliases offered as genres")
+        self.assertEqual(sent[0]["extra_body"]["thinking"], {"type": "disabled"}, "someone is waiting")
+        self.assertEqual(mp.closest_genres("boom"), [])
 
     def test_resume_remembers_last_station_and_volume_across_restarts(self):
         mp = self.mp
