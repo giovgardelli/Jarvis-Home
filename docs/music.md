@@ -130,6 +130,7 @@ Jarvis's voice, timers, brief ──► ffmpeg | aplay ────────�
 | Symptom | Look at |
 |---|---|
 | "Music isn't set up on this speaker yet" | Run `deploy/setup_music.sh`. Check `JARVIS_PLAYBACK=jarvis` in `~/.jarvis_env` |
+| Still "isn't set up" after the setup | The running Jarvis must see the setting: `tr '\0' '\n' < /proc/$(systemctl --user show jarvis -p MainPID --value)/environ \| grep PLAYBACK`. A service that loads `~/.jarvis_env` with plain `source` needs the line as `export JARVIS_PLAYBACK=jarvis` (re-running the script writes it that way) |
 | Jarvis goes silent after the setup | `speaker-test -D jarvis …`. If that fails, check the card in `/etc/asound.conf` against `aplay -l` |
 | Radio says "Playing" but nothing plays | `mpv --audio-device=alsa/jarvis <the url>` shows the error. `journalctl --user -u jarvis -f` shows `[Music]` lines |
 | "Jarvis" not in the AirPlay list | `systemctl status shairport-sync`. The phone and Pi must be on the same network |

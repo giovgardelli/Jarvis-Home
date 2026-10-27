@@ -28,10 +28,10 @@ FLAG=/dev/shm/jarvis-airplay
 # The speaker, from JARVIS_AUDIO_OUT (default hw:2,0, as in jarvis_core/config.py)
 OUT="hw:2,0"
 if [ -f "$ENV_FILE" ]; then
-  line=$(grep -E '^JARVIS_AUDIO_OUT=' "$ENV_FILE" | tail -1 || true)
-  [ -n "$line" ] && OUT="${line#JARVIS_AUDIO_OUT=}"
+  line=$(grep -E '^(export +)?JARVIS_AUDIO_OUT=' "$ENV_FILE" | tail -1 || true)
+  [ -n "$line" ] && OUT="${line#*JARVIS_AUDIO_OUT=}"
 fi
-OUT="${OUT%%#*}"; OUT="${OUT//[[:space:]]/}"
+OUT="${OUT%%#*}"; OUT="${OUT//[[:space:]\"\']/}"
 if [[ "$OUT" =~ ^(plug)?hw:(CARD=)?([^,]+)(,(DEV=)?([0-9]+))?$ ]]; then
   CARD="${BASH_REMATCH[3]}"; DEV="${BASH_REMATCH[6]:-0}"
 else
@@ -90,11 +90,12 @@ pcm.jarvis_airplay {
 EOF
 echo "[music] wrote /etc/asound.conf"
 
-# 3. point the voice loop at the mixing device
-if [ -f "$ENV_FILE" ] && grep -qE '^JARVIS_PLAYBACK=' "$ENV_FILE"; then
-  sed -i 's/^JARVIS_PLAYBACK=.*/JARVIS_PLAYBACK=jarvis/' "$ENV_FILE"
+# 3. point the voice loop at the mixing device. "export" so it reaches Jarvis
+#    however the service loads the file (with or without `set -a`)
+if [ -f "$ENV_FILE" ] && grep -qE '^(export +)?JARVIS_PLAYBACK=' "$ENV_FILE"; then
+  sed -i -E 's/^(export +)?JARVIS_PLAYBACK=.*/export JARVIS_PLAYBACK=jarvis/' "$ENV_FILE"
 else
-  printf '\n# Speaker shared with the radio and AirPlay (deploy/setup_music.sh)\nJARVIS_PLAYBACK=jarvis\n' >> "$ENV_FILE"
+  printf '\n# Speaker shared with the radio and AirPlay (deploy/setup_music.sh)\nexport JARVIS_PLAYBACK=jarvis\n' >> "$ENV_FILE"
 fi
 echo "[music] JARVIS_PLAYBACK=jarvis in $ENV_FILE"
 
