@@ -14,6 +14,13 @@
 # kept as *.before-jarvis the first time.
 set -euo pipefail
 
+# As yourself, not root: the settings go in YOUR ~/.jarvis_env, and Jarvis is
+# one of your user services. The script asks for sudo itself where needed.
+if [ "$(id -u)" -eq 0 ]; then
+  echo "[music] Run this without sudo: bash ~/jarvis-home/deploy/setup_music.sh" >&2
+  exit 1
+fi
+
 AIRPLAY_NAME="${1:-Jarvis}"
 ENV_FILE="$HOME/.jarvis_env"
 FLAG=/dev/shm/jarvis-airplay
@@ -83,7 +90,15 @@ pcm.jarvis_airplay {
 EOF
 echo "[music] wrote /etc/asound.conf"
 
-# 3. AirPlay: play through the mixer, and tell Jarvis while a phone is playing
+# 3. point the voice loop at the mixing device
+if [ -f "$ENV_FILE" ] && grep -qE '^JARVIS_PLAYBACK=' "$ENV_FILE"; then
+  sed -i 's/^JARVIS_PLAYBACK=.*/JARVIS_PLAYBACK=jarvis/' "$ENV_FILE"
+else
+  printf '\n# Speaker shared with the radio and AirPlay (deploy/setup_music.sh)\nJARVIS_PLAYBACK=jarvis\n' >> "$ENV_FILE"
+fi
+echo "[music] JARVIS_PLAYBACK=jarvis in $ENV_FILE"
+
+# 4. AirPlay: play through the mixer, and tell Jarvis while a phone is playing
 backup /etc/shairport-sync.conf
 sudo tee /etc/shairport-sync.conf >/dev/null <<EOF
 // Written by jarvis-home/deploy/setup_music.sh. Re-run the script rather than editing this.
@@ -109,17 +124,13 @@ ExecStartPre=-/bin/rm -f $FLAG
 ExecStopPost=-/bin/rm -f $FLAG
 EOF
 sudo systemctl daemon-reload
-sudo systemctl enable --now shairport-sync >/dev/null
-sudo systemctl restart shairport-sync
-echo "[music] shairport-sync running as \"$AIRPLAY_NAME\""
-
-# 4. point the voice loop at the mixing device
-if [ -f "$ENV_FILE" ] && grep -qE '^JARVIS_PLAYBACK=' "$ENV_FILE"; then
-  sed -i 's/^JARVIS_PLAYBACK=.*/JARVIS_PLAYBACK=jarvis/' "$ENV_FILE"
+# The radio doesn't need AirPlay, so a failure here is reported, not fatal
+if sudo systemctl enable shairport-sync >/dev/null 2>&1 && sudo systemctl restart shairport-sync; then
+  echo "[music] shairport-sync running as \"$AIRPLAY_NAME\""
 else
-  printf '\n# Speaker shared with the radio and AirPlay (deploy/setup_music.sh)\nJARVIS_PLAYBACK=jarvis\n' >> "$ENV_FILE"
+  echo "[music] WARNING: AirPlay (shairport-sync) didn't start; the radio still works."
+  echo "        See: sudo journalctl -u shairport-sync -n 30"
 fi
-echo "[music] JARVIS_PLAYBACK=jarvis in $ENV_FILE"
 
 # 5. restart Jarvis so it plays through the mixer
 if systemctl --user list-unit-files jarvis.service >/dev/null 2>&1; then
