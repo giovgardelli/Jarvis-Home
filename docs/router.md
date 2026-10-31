@@ -9,6 +9,7 @@ worth borrowing.
 ```
 request
   ├─ "text me that" / "tell me more"          → replay the last answer
+  ├─ "1 is done" / "mark 2 and 3 done"        → tick off tasks numbered in today's brief
   ├─ timer / alarm / time                     → handled on the Pi (voice only)
   ├─ music: play / stop / louder / what's on  → the radio on the Pi (voice only)
   ├─ "what are my priorities"                 → ask several agents in parallel, merge
@@ -40,6 +41,10 @@ request
 - **Unknown speaker** — with voice ID off, agents marked `needs_speaker` (the
   to-do list) take a name from the request or ask "Is that for Gio or Kenz?",
   then run the original request with the answer.
+- **Numbered brief** — the morning brief numbers its tasks in code and
+  remembers which list each came from, so "1 is done" (or just "1 3") is
+  ticked off on the right list without a routing call. Only today's numbers
+  count; a number that isn't in the brief is treated as a normal request.
 - **Task hints** — "I cleaned the gutters": if that task appears in today's
   morning-brief list for one agent, Haiku is told so, and if the first agent
   can't find it, the router retries on the other.

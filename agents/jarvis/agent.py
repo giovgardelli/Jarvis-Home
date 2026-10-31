@@ -58,3 +58,71 @@ def get_morning_data() -> dict:
         "kenz": {"will_due": results.get("will_due_kenz", ""), "andy_mann": results.get("andy_mann", "")},
     }
     return {"gio": context("Gio", "will_due_gio"), "kenz": context("Kenz", "will_due_kenz"), "raw_sources": raw_sources}
+
+
+# ── The written brief: tasks numbered in code, so "1 is done" works ───────────
+# Claude picks and orders this week's tasks (structured output); the numbers,
+# and the record of which list each came from, are added here. The router's
+# "1 is done" reads that record (state.get_brief_items).
+
+MAX_BRIEF_TASKS = 10   # a safety limit only; the prompt asks for the top few
+
+BRIEF_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "greeting": {"type": "string"},
+        "tasks": {"type": "array", "items": {
+            "type": "object",
+            "properties": {
+                "task": {"type": "string"},
+                "list": {"type": "string", "enum": ["will_due", "andy_mann"]},
+                "when": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+            },
+            "required": ["task", "list", "when"],
+            "additionalProperties": False,
+        }},
+        "flights": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        "closing": {"type": "string"},
+    },
+    "required": ["greeting", "tasks", "flights", "closing"],
+    "additionalProperties": False,
+}
+
+
+def brief_prompt(name, data):
+    return (
+        "You are Jarvis. Write " + name + "'s morning briefing as JSON.\n\n"
+        "Data from agents:\n" + data + "\n\n"
+        "- greeting: one warm good-morning sentence.\n"
+        # Which tasks, and how many, is the brief's original rule — only the
+        # numbering is new
+        "- tasks: the top 2-3 tasks due this week, plus key home maintenance — be concise, "
+        "this is a morning summary, not a report. Most urgent first. task: its name exactly as "
+        "written in the data. list: \"will_due\" for to-do items, \"andy_mann\" for home "
+        "maintenance. when: a short note such as \"due Friday\" or \"urgent\", or null.\n"
+        "- flights: one sentence about flights today or this week, or null if none.\n"
+        "- closing: one short encouraging sentence.\n"
+        "Only use what is in the data — never invent tasks or flights."
+    )
+
+
+def render_brief(brief):
+    """(Telegram text, numbered items) from the structured brief."""
+    tasks = [t for t in brief.get("tasks", []) if (t.get("task") or "").strip()][:MAX_BRIEF_TASKS]
+    items = [{"n": n, "task": t["task"].strip(), "list": t["list"], "done": False}
+             for n, t in enumerate(tasks, start=1)]
+    lines = [brief.get("greeting", "Good morning!").strip(), ""]
+    if items:
+        lines.append("📋 *This week*")
+        for item, t in zip(items, tasks):
+            home = "🏠 " if item["list"] == "andy_mann" else ""
+            when = (t.get("when") or "").strip()
+            lines.append(f"#{item['n']} {home}{item['task']}" + (f" — {when}" if when else ""))
+        lines.append("_Reply \"1 done\" (or \"mark 2 and 3 done\") to tick them off._")
+    else:
+        lines.append("📋 Nothing due this week.")
+    if brief.get("flights"):
+        lines += ["", "✈️ " + brief["flights"].strip()]
+    if brief.get("closing"):
+        lines += ["", brief["closing"].strip()]
+    return "\n".join(lines), items
