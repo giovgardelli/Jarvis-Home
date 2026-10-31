@@ -54,7 +54,9 @@ Each agent in `registry.json` has:
      `jarvis_core.voice.VOICE_INSTRUCTION` / `split_voice` to get it from the
      same Claude call; otherwise the router shortens long replies for you.
    - `status` (optional): `"list"` with a `tasks` array lets multi-agent
-     answers be combined in code; `"not_found"` enables the "try the other list" retry.
+     answers be combined in code; `"not_found"` enables the "try the other list" retry;
+     `"question"` with an `answers` list ("upstairs", "downstairs") sends a short
+     reply containing one of them back to this agent.
 3. Add it to `registry.json` with a one-line `routing_hint` — the router's
    prompt and its list of allowed destinations are built from the registry.
 4. Add phrases to `tests/test_router_rules.py` if you add keyword shortcuts.
