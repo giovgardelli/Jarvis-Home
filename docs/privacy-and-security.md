@@ -22,6 +22,7 @@ use cloud AI because a Raspberry Pi can't do them fast enough yet.
 | Conversation history and state (SQLite file) | **Web questions** → Google Gemini; **radio searches** → Radio Browser (and Anthropic for the closest genre) |
 | All API keys and secrets | **Lists and calendar** → your own Google Sheets / Calendar |
 | The agents themselves (localhost only) | **Telegram messages** → Telegram |
+| The thermostat limits (enforced in code) | **Thermostat commands and readings** → Google Nest |
 
 Each provider's own data-retention policy applies to what you send it. Review
 them, and prefer providers and account settings that don't train on your
@@ -71,7 +72,7 @@ voice:
 
 | Tier | Examples | Who can use it by voice |
 |---|---|---|
-| **Public** | Timers, alarms, web questions, small talk | Anyone — guests welcome |
+| **Public** | Timers, alarms, web questions, small talk, the thermostat | Anyone — guests welcome |
 | **Household** | Shopping list, home maintenance | A recognized voice, or "probably someone who lives here" |
 | **Personal** | To-do list, calendar and flights, fare tracking, "text me that", the morning brief | A confirmed voice only |
 

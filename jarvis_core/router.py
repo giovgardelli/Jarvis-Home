@@ -9,11 +9,15 @@ Telegram service (agents/jarvis, channel="telegram"). Order of checks:
      music (radio, volume, stop)   — voice only, keyword rules (music_player.py)
   3. multi-agent questions         — ask Will Due + Andy Mann in parallel, merge
   4. explicit web searches         — Gemini with Google Search
-  5. unambiguous shortcuts         — shopping list, flights
+  5. unambiguous shortcuts         — shopping list, flights, thermostat
   6. Haiku (structured output)     — picks an agent, Gemini, or answers directly;
                                      a completed task found in today's brief is
                                      hinted to the right list, with a retry on
                                      that list if the first agent can't find it
+
+An agent that asks something ("Upstairs or downstairs?") returns status
+"question" and the words that answer it; a short reply with one of them goes
+straight back to that agent.
 """
 import os
 from jarvis_core.config import TIMEZONE
@@ -155,6 +159,30 @@ def _owner_answer(text, channel):
     if _mentions_shared(text):
         return pending["text"] + f" (shared, for {household.everyone()})", DEFAULT_SPEAKER
     return None
+
+
+# ── An agent's question ───────────────────────────────────────────────────────
+# "Upstairs or downstairs?" (Ray Mote): the agent returns status "question"
+# and the words that answer it. A short reply containing one goes straight
+# back to that agent; anything else is a new request.
+
+_pending_agent = {}            # channel -> {"agent", "answers", "expires"}
+
+
+def _remember_question(result, agent_id, channel):
+    if result.get("status") == "question" and result.get("answers"):
+        _pending_agent[channel] = {"agent": agent_id, "answers": result["answers"],
+                                   "expires": time.time() + OWNER_ANSWER_TIMEOUT}
+
+
+def _agent_answer(text, channel):
+    """The agent this reply answers, or None."""
+    pending = _pending_agent.pop(channel, None)
+    if not pending or pending["expires"] < time.time():
+        return None
+    if len(_normalize(text).split()) > OWNER_ANSWER_MAX_WORDS or not _contains(text, pending["answers"]):
+        return None
+    return pending["agent"]
 
 
 def _structured(schema):
@@ -321,6 +349,54 @@ MESSAGING_TRIGGERS = [
     "message my husband", "tell my wife", "tell my husband"
 ]
 
+# Thermostat (Ray Mote): a climate word with something to do or somewhere
+# inside — "set the heat to 70", "what's the temperature upstairs" — while
+# "temperature in Paris" stays a web search and "service the HVAC" or "when is
+# the furnace filter due" stays maintenance (Andy Mann, via Haiku).
+CLIMATE_NOUNS = [
+    "thermostat", "thermostats", "heat", "heater", "heating", "ac", "a/c", "air conditioning",
+    "air conditioner", "air con", "cooling", "temperature", "temp", "degrees", "eco mode", "hvac", "furnace"
+]
+CLIMATE_VERBS = [
+    "set", "turn", "switch", "raise", "lower", "increase", "decrease", "bump", "crank", "drop",
+    "put", "change", "adjust", "make", "keep", "shut"
+]
+CLIMATE_PLACES = ["upstairs", "downstairs", "inside", "indoors", "in here", "in the house"]
+COMFORT_WORDS = ["warm", "warmer", "cool", "cooler", "cold", "colder", "hot", "hotter", "chilly"]
+COMFORT_PHRASES = [
+    "make it warmer", "make it cooler", "make it colder", "warm it up", "cool it down",
+    "heat it up", "a bit warmer", "a bit cooler", "a little warmer", "a little cooler",
+    "i'm cold", "i'm freezing", "i'm hot", "it's cold in here", "it's hot in here",
+    "it's freezing in here", "too cold in here", "too hot in here", "too warm in here"
+]
+NOT_CLIMATE = [
+    "filter", "service", "serviced", "servicing", "maintenance", "warranty", "repair", "fix",
+    "contractor", "technician", "plumber", "due", "last time", "when did", "replace", "replaced",
+    "clean", "inspect", "broken", "leak", "leaking", "noise", "battery", "batteries", "buy", "order",
+    "install", "outside", "weather", "forecast", "tomorrow", "this week", "next week", "weekend",
+    "oven", "grill", "cook", "cooking", "bake", "baking", "fridge", "freezer", "water heater",
+    "pool", "hot tub", "shower", "fever"
+]
+SET_TO_NUMBER = re.compile(r"\b(?:set|put|turn|change|keep|make) (?:it|that|things|everything|"
+                           r"upstairs|downstairs|both)(?: up| down)? (?:to |at )?([4-9]\d)\b(?! ?(?:%|percent))")
+
+
+def _is_climate(text):
+    """A request for the thermostats (Ray Mote)."""
+    t = _normalize(text)
+    if _contains(t, NOT_CLIMATE):
+        return False
+    if _contains(t, COMFORT_PHRASES) or SET_TO_NUMBER.search(t):
+        return True
+    if _contains(t, ["thermostat", "thermostats", "eco mode", "heat and cool"]):
+        return True
+    if _contains(t, CLIMATE_NOUNS) and (_contains(t, CLIMATE_VERBS) or _contains(t, CLIMATE_PLACES)):
+        return True
+    if re.search(r"\bis the (?:heat|heating|ac|a/c|air conditioning|air|furnace) (?:on|off|running)\b", t):
+        return True
+    return _contains(t, ["upstairs", "downstairs"]) and _contains(t, COMFORT_WORDS)
+
+
 # Only explicit search phrasing goes straight to Gemini (this path skips voice
 # ID). Generic questions ("what's...", "when is...") go through the Haiku
 # router, which can still pick gemini_search — so "what's on my to-do list"
@@ -351,6 +427,8 @@ def _is_web_search(text: str) -> bool:
         return False
     if _contains(t, MESSAGING_TRIGGERS) or _contains(t, BRIEF_TRIGGERS):
         return False
+    if _is_climate(t):
+        return False
     return _contains(t, WEB_SEARCH_TRIGGERS)
 
 # ── Detection helpers ─────────────────────────────────────────────────────────
@@ -368,7 +446,7 @@ def _contains(text, triggers):
 def _is_multi_agent(text):
     # Never trigger multi-agent for write operations
     write_words = ["add", "create", "remove", "delete", "mark", "complete", "update", "set", "cancel", "reschedule"]
-    if _contains(text, write_words):
+    if _contains(text, write_words) or _is_climate(text):
         return False
     return _contains(text, MULTI_AGENT_TRIGGERS)
 
@@ -412,6 +490,8 @@ def _music_intent(text):
     stop, up, down, now. query is what to play ("" = the last station)."""
     t = re.sub(r"[.!?,]+$", "", _normalize(text)).strip()
     t = re.sub(r"^(?:(?:hey )?jarvis,? |please )+", "", t)
+    if SET_TO_NUMBER.search(t) and _is_climate(t):   # "turn it down to 68" is the thermostat
+        return None
     if t in MUSIC_STOP_EXACT or (_contains(t, MUSIC_STOP_VERBS) and _contains(t, MUSIC_NOUNS)):
         return ("stop", "")
     if t in MUSIC_RESUME_EXACT or (_contains(t, ["resume", "unpause"]) and _contains(t, MUSIC_NOUNS)):
@@ -526,6 +606,7 @@ def dispatch(agent_id, intent, params, speaker, voice_mode=True, chat_id=0):
             "voice_text": data.get("voice_text"),
             "status": data.get("status", "unknown"),
             "tasks": data.get("tasks", []),
+            "answers": data.get("answers", []),   # with status "question"
         }
     except requests.exceptions.Timeout:
         return error(f"{name} is taking too long — please try again in a moment.")
@@ -884,6 +965,10 @@ def _local_route(text: str) -> str | None:
     if _contains(t, FLIGHT_TRIGGERS):
         return "drew_parture"
 
+    # Thermostat — Ray Mote, when installed
+    if registry_agent("ray_mote") and _is_climate(t):
+        return "ray_mote"
+
     # Tasks and maintenance — too ambiguous, let Haiku decide
     # "my tasks" could be Will Due or Andy Mann
     # "I fixed X" completion depends on what X is
@@ -947,12 +1032,25 @@ def route(text, speaker, history=None, last_full=None, voice_mode=True,
             return route(original, who, history, last_full, voice_mode, channel, task_sources, chat_id,
                          voice_status)
 
+    # The answer to an agent's question ("Upstairs or downstairs?")
+    answering = _agent_answer(text, channel)
+
     # Who the request is for: the known speaker, else a name said in it
     named = _speaker_from_text(text) if speaker is None else None
     owner_known = speaker is not None or named is not None or _mentions_shared(text)
     speaker = speaker or named or DEFAULT_SPEAKER
 
     try:
+        if answering:
+            blocked = _gate(access(answering), voice_status)
+            if blocked:
+                return blocked
+            print(f"[Router] Answer to {answering}'s question", flush=True)
+            result = dispatch(answering, text, {"original_message": text}, speaker,
+                              voice_mode=voice_mode, chat_id=chat_id)
+            _remember_question(result, answering, channel)
+            return _render(result, speaker, voice_mode)
+
         # Text me that
         if _is_text_me(text, last_full) and last_full:
             return _gate("personal", voice_status) or {
@@ -1049,8 +1147,10 @@ def route(text, speaker, history=None, last_full=None, voice_mode=True,
             if not owner_known and needs_speaker(task_hint):
                 return _ask_owner(text, channel)
             print(f"[Router] {agent_id} couldn't find it → retrying on {task_hint}", flush=True)
+            agent_id = task_hint
             result = dispatch(task_hint, intent, params, speaker, voice_mode=voice_mode, chat_id=chat_id)
 
+        _remember_question(result, agent_id, channel)
         return _render(result, speaker, voice_mode)
 
     except Exception as e:

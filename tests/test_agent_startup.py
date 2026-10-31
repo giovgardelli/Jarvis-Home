@@ -9,7 +9,7 @@ import unittest
 
 from helpers import AGENTS
 
-AGENT_NAMES = ["andy_mann", "drew_parture", "shawn_ping", "will_due", "miles_ahead", "jarvis"]
+AGENT_NAMES = ["andy_mann", "drew_parture", "shawn_ping", "will_due", "miles_ahead", "ray_mote", "jarvis"]
 
 STARTUP_SCRIPT = r'''
 import os, runpy, sys

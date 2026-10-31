@@ -13,7 +13,8 @@ request
   ├─ music: play / stop / louder / what's on  → the radio on the Pi (voice only)
   ├─ "what are my priorities"                 → ask several agents in parallel, merge
   ├─ explicit web search ("search for…")      → Gemini with Google Search
-  ├─ unambiguous shortcut (shopping, flights) → that agent, no AI call
+  ├─ unambiguous shortcut (shopping, flights,
+  │   thermostat)                             → that agent, no AI call
   └─ everything else                          → Claude Haiku picks the agent
 ```
 
@@ -40,6 +41,10 @@ request
 - **Unknown speaker** — with voice ID off, agents marked `needs_speaker` (the
   to-do list) take a name from the request or ask "Is that for Gio or Kenz?",
   then run the original request with the answer.
+- **An agent's question** — an agent that needs one more detail (Ray Mote:
+  "Upstairs or downstairs?") returns `status: "question"` and the words that
+  answer it (`answers`). A short reply containing one of them goes straight
+  back to that agent; anything else is treated as a new request.
 - **Task hints** — "I cleaned the gutters": if that task appears in today's
   morning-brief list for one agent, Haiku is told so, and if the first agent
   can't find it, the router retries on the other.

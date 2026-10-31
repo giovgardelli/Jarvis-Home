@@ -24,6 +24,7 @@ Plan for an evening. Most of the time goes into creating accounts and keys.
 | AviationStack | Drew Parture (flight status) | aviationstack.com |
 | SerpApi | Miles Ahead (fares) | serpapi.com |
 | AirNow *(optional)* | Andy Mann (air quality, US) | docs.airnowapi.org |
+| Google Device Access *(US$5 once)* | Ray Mote (Nest thermostats) | [agents/ray_mote](../agents/ray_mote/README.md#set-up-nest-access-about-an-hour-once) |
 
 ## 2. Prepare the Pi
 
@@ -79,7 +80,7 @@ Bots use long-polling, so there's nothing to expose to the internet.
 cp deploy/jarvis_env.example ~/.jarvis_env && chmod 600 ~/.jarvis_env
 nano ~/.jarvis_env                                  # shared keys
 
-for a in andy_mann drew_parture shawn_ping will_due miles_ahead jarvis; do
+for a in andy_mann drew_parture shawn_ping will_due miles_ahead ray_mote jarvis; do
   cp agents/$a/.env.example agents/$a/.env && chmod 600 agents/$a/.env
 done
 nano agents/shawn_ping/.env                         # …and each agent you use
@@ -161,7 +162,8 @@ no accounts: `bash deploy/setup_music.sh`. See [music.md](music.md).
 ```bash
 # update after pulling changes
 cd ~/jarvis-home && git pull && systemctl --user restart jarvis 'jarvis-*'
-# (re-run deploy/pi_deploy.sh when deploy/ or requirements changed)
+# (re-run deploy/pi_deploy.sh when deploy/, requirements or registry.json changed;
+#  it restarts the agents and the voice loop)
 
 # logs
 journalctl --user -u jarvis -f            # voice loop

@@ -33,6 +33,7 @@ Telegram bot**, without the voice assistant.
 | **Will Due** | Shared to-do list with owners and priorities | Telegram, Google Sheets, Anthropic | [agents/will_due](agents/will_due/README.md) |
 | **Andy Mann** | Home maintenance schedule, warranties, contractors, weather & air-quality alerts | Telegram, Google Sheets, Anthropic (+ AirNow) | [agents/andy_mann](agents/andy_mann/README.md) |
 | **Drew Parture** | Flights from your Google Calendar: morning heads-up, delay, departure and landing alerts | Telegram, Google Calendar, AviationStack, Anthropic | [agents/drew_parture](agents/drew_parture/README.md) |
+| **Ray Mote** | Nest thermostats by voice: set, warmer/cooler, heat/cool/eco, what it's set to, within limits you choose | Google Nest (Device Access), Anthropic for unusual phrasing | [agents/ray_mote](agents/ray_mote/README.md) |
 | **Miles Ahead** | Watches your booked Southwest fares and alerts you when the price drops | Telegram, Google Calendar + Sheets, SerpApi | [agents/miles_ahead](agents/miles_ahead/README.md) |
 | **Jarvis (central)** | Telegram front door to all agents, 7am morning brief, model-update check | Telegram, Anthropic, Gemini | [agents/jarvis](agents/jarvis/README.md) |
 | **Music** *(optional)* | Free internet radio by voice ("play some jazz") and AirPlay from your phone; music turns down when you say "Hey Jarvis" | Voice assistant, `mpv`, `shairport-sync` (no accounts) | [docs/music.md](docs/music.md) |
