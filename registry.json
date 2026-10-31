@@ -130,6 +130,30 @@
       "notify_targets": {
         "gio": "GIO_CHAT_ID"
       }
+    },
+    {
+      "id": "ray_mote",
+      "display_name": "Ray Mote",
+      "routing_hint": "controlling the Nest thermostats now — set or change the temperature, warmer/cooler, heat/cooling/off, eco mode, what it's set to, how warm it is inside (NOT HVAC maintenance or the weather)",
+      "access": "public",
+      "endpoint": "http://127.0.0.1:5007/jarvis",
+      "bot_username": "@RayMoteBot",
+      "capabilities": [
+        "set the temperature upstairs, downstairs or both",
+        "make it warmer or cooler",
+        "switch heat, cooling, heat-and-cool or off",
+        "eco mode on and off",
+        "current temperature and set points",
+        "keeps every setting inside the temperature limits you set"
+      ],
+      "example_phrases": [
+        "set upstairs to 70",
+        "make it a bit warmer downstairs",
+        "turn on the heat",
+        "what's the thermostat set to",
+        "put the house in eco mode"
+      ],
+      "notify_targets": {}
     }
   ]
 }

@@ -43,7 +43,8 @@ What drives cost, roughly in order:
 | SerpApi | Searches (Miles Ahead fare checks) | Flights under $55 aren't checked; checks are spaced out |
 | AviationStack | API calls (Drew Parture) | Polling starts 2 h before departure and stops after landing |
 | Gemini | Web answers + a model check every 14 days | — |
-| Google Sheets / Calendar, Telegram | Free | — |
+| Google Device Access | US$5 once (Ray Mote, Nest thermostats) | — |
+| Google Sheets / Calendar, Nest API, Telegram | Free | — |
 
 The voice assistant is the main cost; the Telegram-only agents are cheap.
 

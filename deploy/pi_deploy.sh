@@ -35,6 +35,7 @@ loginctl enable-linger "$(whoami)" 2>/dev/null || true
 declare -A PORT=(
   [andy_mann]=5001 [drew_parture]=5002 [shawn_ping]=5003
   [will_due]=5004  [miles_ahead]=5005  [jarvis]=5006
+  [ray_mote]=5007
 )
 
 # 4. generate + install a user systemd unit per agent
@@ -78,9 +79,18 @@ for name in "${!PORT[@]}"; do
     || echo "[deploy] jarvis-$name FAILED — journalctl --user -u jarvis-$name -n 40"
 done
 
+# The voice loop (set up separately, docs/setup.md §8) reads registry.json and
+# the router at start, so restart it too or it won't know about new agents.
+if [ -f "$UNIT_DIR/jarvis.service" ]; then
+  systemctl --user restart jarvis \
+    && echo "[deploy] restarted the voice loop (jarvis)" \
+    || echo "[deploy] voice loop FAILED to restart — journalctl --user -u jarvis -n 40"
+fi
+
 echo ""
 echo "[deploy] done. Local health check (agents can take ~10-20s to boot on a Pi):"
-for name in andy_mann drew_parture shawn_ping will_due miles_ahead jarvis; do
+for name in andy_mann drew_parture shawn_ping will_due miles_ahead jarvis ray_mote; do
+  [ -d "$AGENTS/$name" ] || continue
   p=${PORT[$name]}
   printf "  %-13s :%s -> " "$name" "$p"
   reply=""
