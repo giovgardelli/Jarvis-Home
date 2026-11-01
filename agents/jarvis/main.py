@@ -1,6 +1,7 @@
 import os
 from jarvis_core.config import TIMEZONE
 import io
+import json
 import random
 import threading
 import requests
@@ -382,24 +383,21 @@ def run_morning_briefing():
         name = "Gio" if speaker == "gio" else "Kenz"
         chat_id = os.environ.get("GIO_CHAT_ID" if speaker == "gio" else "KENZ_CHAT_ID")
 
-        summary_prompt = (
-            "You are Jarvis. Generate a personalized morning briefing for " + name + ".\n\n"
-            "Data from agents:\n" + data.get(speaker, "No data available") + "\n\n"
-            "Rules:\n"
-            "- Telegram text format with Markdown\n"
-            "- Start with a warm good morning greeting\n"
-            "- Cover: top 2-3 tasks due this week, any flights today, key home maintenance\n"
-            "- Be concise — this is a morning summary, not a report\n"
-            "- End with something encouraging\n"
-        )
-
+        # Tasks are numbered in code (agent.render_brief) so a reply of
+        # "1 is done" can find them: the numbered list is kept for today
+        from agent import BRIEF_SCHEMA, brief_prompt, render_brief
         resp = client.messages.create(
             model=llm.MODEL,
-            max_tokens=550,
-            extra_body=llm.fast(),
-            messages=[{"role": "user", "content": summary_prompt}]
+            max_tokens=900,
+            extra_body=llm.fast({"output_config": {"format": {"type": "json_schema", "schema": BRIEF_SCHEMA}}}),
+            messages=[{"role": "user", "content": brief_prompt(name, data.get(speaker, "No data available"))}]
         )
-        text_summary = llm.text(resp)
+        try:
+            text_summary, items = render_brief(json.loads(llm.text(resp)))
+        except (ValueError, KeyError, TypeError) as e:
+            print(f"[Briefing] Brief for {name} wasn't valid JSON ({e}) — sending it unnumbered", flush=True)
+            text_summary, items = llm.text(resp), []
+        state.set_brief_items(speaker, {"date": today.isoformat(), "items": items})
 
         if chat_id:
             message_text = text_summary

@@ -5,6 +5,7 @@ Used by both the voice loop (jarvis-pi.py, channel="voice") and the central
 Telegram service (agents/jarvis, channel="telegram"). Order of checks:
 
   1. "text me that" / "hear more"  — replay the last full answer
+     "1 is done"                   — tick off a task numbered in today's brief
   2. timers and alarms             — voice only (Telegram can't ring)
      music (radio, volume, stop)   — voice only, keyword rules (music_player.py)
   3. multi-agent questions         — ask Will Due + Andy Mann in parallel, merge
@@ -577,6 +578,76 @@ def _agent_not_found(result):
     return any(p in text for p in ["don't see", "not in your task", "not in your list", "couldn't find that task"])
 
 
+# ── "1 is done": tasks numbered in this morning's brief ───────────────────────
+# The written brief numbers this week's tasks (agents/jarvis/agent.py) and keeps
+# which list each came from (state.get_brief_items), so "mark 2 and 3 done" or
+# just "1" is ticked off on the right list. Only today's brief counts.
+
+BRIEF_DONE_RE = re.compile(
+    r"(?:mark |tick off |check off |cross off |i (?:did|finished|completed|have done) |"
+    r"finished |completed |done:? )?"
+    r"((?:number |no\.? )?\d{1,2}(?:(?:\s*,\s*|\s+)(?:and\s+|&\s*)?(?:number |no\.? )?\d{1,2})*)"
+    r"(?: (?:is|are|as|was|were|has been|have been))?(?: (?:done|complete|completed|finished|off))?")
+
+
+NUMBER_WORDS = {w: str(n) for n, w in enumerate(
+    ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"], start=1)}
+
+
+def _brief_numbers(text):
+    """[1, 3] for "mark 1 and 3 done" (or a bare "1 3"), else None.
+    Spoken numbers count too: "one is done"."""
+    t = re.sub(r"[.!?]+$", "", _normalize(text).replace("#", "")).strip()
+    t = re.sub(r"\b(" + "|".join(NUMBER_WORDS) + r")\b", lambda m: NUMBER_WORDS[m.group(1)], t)
+    t = re.sub(r"^(?:(?:hey )?jarvis,? |please |ok,? |okay,? )+", "", t)
+    t = re.sub(r",? (?:please|thanks|thank you)$", "", t)
+    m = BRIEF_DONE_RE.fullmatch(t)
+    return sorted({int(n) for n in re.findall(r"\d+", m.group(1))}) if m else None
+
+
+def _todays_brief(speaker):
+    brief = state.get_brief_items(speaker)
+    return brief.get("items", []) if brief.get("date") == datetime.now(PT).date().isoformat() else []
+
+
+def _complete_from_brief(numbers, items, speaker, chat_id):
+    """Mark brief items done on the list each came from. Returns the reply."""
+    by_number = {i["n"]: i for i in items}
+    already = [by_number[n] for n in numbers if by_number[n].get("done")]
+    todo = {}
+    for n in numbers:
+        if not by_number[n].get("done"):
+            todo.setdefault(by_number[n]["list"], []).append(by_number[n])
+
+    done, failed = [], []
+    for agent_id, group in todo.items():
+        names = [i["task"] for i in group]
+        message = (f"Mark {names[0]} as done" if len(names) == 1
+                   else "Mark these as done: " + "; ".join(names))
+        result = dispatch(agent_id, message, {"original_message": message}, speaker,
+                          voice_mode=False, chat_id=chat_id)
+        if result.get("status") == "completed":
+            done += group
+        else:
+            failed.append((group, result.get("response_text") or ""))
+
+    for i in done:
+        i["done"] = True
+    if done:
+        state.set_brief_items(speaker, {"date": datetime.now(PT).date().isoformat(), "items": items})
+
+    def label(group):
+        return ", ".join(f"#{i['n']} {i['task']}" for i in group)
+    parts = []
+    if done:
+        parts.append(f"✅ Done: {label(sorted(done, key=lambda i: i['n']))}.")
+    if already:
+        parts.append(f"{label(already)} {'was' if len(already) == 1 else 'were'} already ticked off.")
+    for group, reply in failed:
+        parts.append(f"I couldn't tick off {label(group)}: {reply}".strip())
+    return " ".join(parts)
+
+
 # ── Agent dispatch ────────────────────────────────────────────────────────────
 
 def dispatch(agent_id, intent, params, speaker, voice_mode=True, chat_id=0):
@@ -1065,6 +1136,23 @@ def route(text, speaker, history=None, last_full=None, voice_mode=True,
                 result = _truncate_for_voice(last_full, speaker)
                 return {"response_text": result["truncated"], "full_response": None, "force_text": False}
             return {"response_text": last_full, "full_response": None, "force_text": False}
+
+        # "1 is done" — a task numbered in today's brief
+        numbers = _brief_numbers(text)
+        if numbers:
+            items = _todays_brief(speaker)
+            if items and all(1 <= n <= len(items) for n in numbers):
+                lists = sorted({i["list"] for i in items if i["n"] in numbers})
+                blocked = _gate(_strictest([access(a) for a in lists]), voice_status)
+                if blocked:
+                    return blocked
+                if not owner_known and any(needs_speaker(a) for a in lists):
+                    return _ask_owner(text, channel)
+                print(f"[Router] Brief items {numbers} done", flush=True)
+                _log_routing_decision(text, "brief_done", "local")
+                response_text = _complete_from_brief(numbers, items, speaker, chat_id)
+                return {"response_text": response_text, "full_response": response_text, "force_text": False}
+
 
         # Timers and alarms ring on the Pi speaker only
         if _is_timer_request(text):

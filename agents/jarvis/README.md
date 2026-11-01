@@ -7,7 +7,10 @@ Runs as the user service `jarvis-jarvis` (`pi_run.py`). It:
   router in `jarvis_core/router.py` (`agent.py` is the thin adapter);
 - builds the **7am morning brief**: asks the agents for this week's tasks,
   maintenance and flights (in parallel), sends each person a Telegram
-  summary, and keeps a short spoken version for the Pi to fetch;
+  summary, and keeps a short spoken version for the Pi to fetch. The tasks
+  it shows (the top 2–3 plus key home maintenance) are **numbered** (`#1`,
+  `#2`…); reply "1 done" or "mark 2 and 3 done" to tick them off on the
+  right list (to-do or home maintenance);
 - runs the **Google auth check** (6:30am) and the **model check**
   (6:40am, every 14 days — `model_watch.py`).
 

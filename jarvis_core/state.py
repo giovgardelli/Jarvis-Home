@@ -103,6 +103,15 @@ def set_task_sources(speaker, sources: dict):
     _set(f"task_sources:{speaker}", sources)
 
 
+def get_brief_items(speaker) -> dict:
+    """This morning's numbered tasks: {"date": "YYYY-MM-DD", "items": [{"n", "task", "list", "done"}]}"""
+    return _get(f"brief_items:{speaker}", {})
+
+
+def set_brief_items(speaker, brief: dict):
+    _set(f"brief_items:{speaker}", brief)
+
+
 def get_model_watch() -> dict:
     """Model-watch record: last_run date, today's advisory, last reported text."""
     return _get("model_watch", {})
