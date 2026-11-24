@@ -11,8 +11,9 @@ and web questions on its own, and everything else through the
 2. **Recording** — until you stop talking (~0.8 s of silence), max 6 s.
 3. **In parallel:** speech-to-text (Deepgram) and, if enabled,
    [voice ID](voice-id.md) on the Pi.
-4. **In parallel again:** the router works on your request **while** a short
-   "on it" chime plays.
+4. **Routing** — the router works on your request. A short "on it" clip
+   can play meanwhile; it's off by default now that replies come fast
+   (`JARVIS_ACKS=on` in `~/.jarvis_env` turns it back on).
 5. **Reply** — streamed from ElevenLabs straight to the speaker: it starts
    playing while the rest is still being generated.
 6. **Follow-up** — only when Jarvis asks something it needs answered ("want to
@@ -60,7 +61,7 @@ Setup: [setup.md](setup.md) steps 2, 5 and 8. Keys: `ANTHROPIC_API_KEY`,
 | Better recognition of your words | Add to the `keyterm` list in `transcribe()`; names come from `household.json` |
 | A different voice | `ELEVENLABS_VOICE_ID` |
 | Music quieter or louder while Jarvis listens | `DUCK_RATIO` in `music_player.py` ([music.md](music.md)) |
-| Different chimes | Replace the mp3s in `~/acks/` |
+| The "on it" clip while Jarvis works | `JARVIS_ACKS=on` (off by default); replace the mp3s in `~/acks/` for different ones |
 
 The loop saves one short audio sample per near-miss wake word to
 `~/wakeword_samples/` (newest 500 kept), handy if you ever train a custom

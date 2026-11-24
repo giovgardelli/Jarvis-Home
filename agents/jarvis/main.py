@@ -10,7 +10,7 @@ import pytz
 from flask import Flask, request, jsonify
 from speaker import identify_speaker
 from agent import jarvis_respond
-from jarvis_core import llm, state
+from jarvis_core import llm, memory, state
 
 app = Flask(__name__)
 
@@ -289,6 +289,7 @@ def process_message(chat_id: int, text: str, speaker: str, voice_mode: bool):
         history.append({"role": "assistant", "content": response_text})
         state.set_history(chat_id, history)
         state.set_last_full(chat_id, full_response)
+        memory.record_exchange(text, response_text, "telegram", speaker)
 
         deliver_response(chat_id, response_text, speaker, voice_mode, force_text)
 
@@ -351,6 +352,19 @@ def morning_briefing():
     return jsonify({"status": "briefing started"})
 
 
+def learned_note(speaker):
+    """What the household memory learned overnight, so wrong guesses get fixed."""
+    try:
+        facts = memory.learned_since(speakers=(speaker,))
+    except Exception as e:
+        print(f"[Briefing] Memory read error: {e}", flush=True)
+        return ""
+    if not facts:
+        return ""
+    return ("\n\n🧠 *New things I learned:*\n" + "\n".join(f"• {f['fact']}" for f in facts)
+            + "\nReply \"forget …\" if any of these are wrong.")
+
+
 def run_morning_briefing():
     from agent import get_morning_data
     import anthropic
@@ -408,6 +422,8 @@ def run_morning_briefing():
                 advisory = todays_advisory()
                 if advisory:
                     message_text += "\n\n🔧 *Model check:*\n" + advisory
+            message_text += memory.reminder_note(speaker)
+            message_text += learned_note(speaker)
             send_message(chat_id, message_text)
             print(f"[Briefing] Sent text summary to {name}")
             # Persist the brief into conversation history
@@ -418,10 +434,13 @@ def run_morning_briefing():
             })
             state.set_history(chat_id, history)
 
+        reminders = memory.reminders_for(speaker) if memory.ENABLED else []
         audio_prompt = (
             "Rewrite this morning briefing as a very short spoken summary for " + name + ". "
             "Maximum 40 words. Natural speech, no markdown. "
             "Just the most important thing or two — flights first if any, then top task.\n\n"
+            + ("Start with these reminders, briefly (no emoji): " + " ".join(reminders) + "\n\n"
+               if reminders else "")
             + text_summary
         )
         audio_resp = client.messages.create(

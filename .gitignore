@@ -25,3 +25,6 @@ alert_state.json
 *.db
 *.log
 *.wav
+
+# Pi-hole's settings, lists and history (pihole/README.md)
+/pihole/etc-pihole/

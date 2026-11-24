@@ -16,3 +16,5 @@ requests
 anthropic
 google-genai
 blinkstick
+# Optional, for LOCAL_STT (docs/going-local.md):
+# useful-moonshine-onnx

@@ -12,7 +12,10 @@ Runs as the user service `jarvis-jarvis` (`pi_run.py`). It:
   `#2`…); reply "1 done" or "mark 2 and 3 done" to tick them off on the
   right list (to-do or home maintenance);
 - runs the **Google auth check** (6:30am) and the **model check**
-  (6:40am, every 14 days — `model_watch.py`).
+  (6:40am, every 14 days — `model_watch.py`);
+- runs the **household memory** learning at 3:30am; new facts appear at the end
+  of each person's brief, along with any date reminders due that day
+  ("🗓 Coming up": birthdays, anniversaries, visits) ([docs/household-memory.md](../../docs/household-memory.md)).
 
 ## Endpoints (localhost only)
 

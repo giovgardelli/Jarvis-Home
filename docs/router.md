@@ -10,6 +10,7 @@ worth borrowing.
 request
   ├─ "text me that" / "tell me more"          → replay the last answer
   ├─ "1 is done" / "mark 2 and 3 done"        → tick off tasks numbered in today's brief
+  ├─ "remember that…" / "forget…"             → household memory
   ├─ timer / alarm / time                     → handled on the Pi (voice only)
   ├─ music: play / stop / louder / what's on  → the radio on the Pi (voice only)
   ├─ "what are my priorities"                 → ask several agents in parallel, merge
@@ -31,6 +32,10 @@ request
 - **Voice-ready replies:** in voice mode agents write a short spoken version
   in the same model call as the full answer, so there's no second
   "shorten this" call. The full answer is kept for "text me that".
+- **Household memory:** facts that match the request (and only those) are
+  added to Haiku's prompt, and facts marked safe for search are given to
+  Gemini to make vague questions specific — see
+  [household-memory.md](household-memory.md).
 - **Honest failures:** if routing fails, the reply says so — it never answers
   "done" for something that didn't happen.
 
@@ -46,7 +51,7 @@ request
   "Upstairs or downstairs?") returns `status: "question"` and the words that
   answer it (`answers`). A short reply containing one of them goes straight
   back to that agent; anything else is treated as a new request.
-- **Numbered brief** — the morning brief numbers its tasks in code and
+- **Numbered brief** — the morning brief numbers this week's tasks in code and
   remembers which list each came from, so "1 is done" (or just "1 3") is
   ticked off on the right list without a routing call. Only today's numbers
   count; a number that isn't in the brief is treated as a normal request.

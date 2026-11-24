@@ -64,6 +64,8 @@ class Music(unittest.TestCase):
         self.metadata, self.found, self.genres = {}, {}, {}
         mp._start_mpv, mp._ipc, mp._radio_browser = start, ipc, radio_browser
         mp.closest_genres = lambda q: self.genres.get(q, [])
+        # mp.subprocess is the real module: put run() back so later tests can use it
+        self.addCleanup(setattr, mp.subprocess, "run", mp.subprocess.run)
         mp.subprocess.run = lambda cmd, **k: self.amixer.append(cmd[-1])
 
     def airplay(self, on):
@@ -252,6 +254,13 @@ class MusicRouting(unittest.TestCase):
             self.assertEqual(len(calls), 4)
         finally:
             r.music_player = None
+
+    def test_offline_decision_knows_music(self):
+        """The speech-to-text shadow compares where each transcript would go."""
+        from router_under_test import get_router
+        r = get_router()
+        self.assertEqual(r.offline_decision("play some jazz"), "music")
+        self.assertEqual(r.offline_decision("lower the volume"), "music")
 
 
 if __name__ == "__main__":

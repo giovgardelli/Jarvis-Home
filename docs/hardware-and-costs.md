@@ -53,8 +53,9 @@ The voice assistant is the main cost; the Telegram-only agents are cheap.
 Every Claude call uses one model, set by `CLAUDE_MODEL` in `~/.jarvis_env`
 (default `claude-haiku-5-5`; code in `jarvis_core/llm.py`). Haiku 5.5 is
 about a tenth of Haiku 4.5's per-token price, though the same text counts as
-roughly 30% more tokens. Every call runs with the model's "thinking"
-switched off, for speed.
+roughly 30% more tokens. Calls someone is waiting on run with the model's
+"thinking" switched off, for speed; only the nightly memory learning lets it
+think.
 
 To go back to Haiku 4.5, set `CLAUDE_MODEL=claude-haiku-4-5-20251001` and
 restart the services. A single agent can use a different model with

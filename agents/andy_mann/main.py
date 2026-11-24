@@ -3,12 +3,15 @@ from jarvis_core.config import TIMEZONE
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 import os
+from datetime import datetime
+
+import pytz
 import requests
  
 load_dotenv()
  
-from agent import chat
-from scheduler import build_daily_message, build_weather_messages
+from agent import chat, complete_tasks
+from scheduler import build_weather_messages
  
 app = Flask(__name__)
  
@@ -18,10 +21,12 @@ GIO_CHAT_ID = os.getenv("GIO_CHAT_ID", "")
 KENZ_CHAT_ID = os.getenv("KENZ_CHAT_ID", "")
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
  
+PT = pytz.timezone(TIMEZONE)
 MAX_HISTORY = 6  # 3 exchanges
  
 # Shared conversation history keyed by speaker ("gio" or "kenz")
 agent_histories = {"gio": [], "kenz": []}
+history_day = {}      # speaker -> the date its history is from
  
  
 def get_speaker(chat_id):
@@ -32,8 +37,18 @@ def get_speaker(chat_id):
     return None
  
  
+def get_history(speaker):
+    """Today's exchanges only. The history carries no dates, so yesterday's
+    "marked X as done" would read as current and can contradict the data."""
+    today = datetime.now(PT).date()
+    if history_day.get(speaker) != today:
+        history_day[speaker] = today
+        agent_histories[speaker] = []
+    return agent_histories[speaker]
+
+
 def update_history(speaker, user_message, assistant_reply):
-    history = agent_histories.get(speaker, [])
+    history = get_history(speaker)
     history.append({"role": "user", "content": user_message})
     history.append({"role": "assistant", "content": assistant_reply})
     if len(history) > MAX_HISTORY:
@@ -83,7 +98,7 @@ def handle_telegram_update(update):
         # Unknown chat_id — fall back to chat_id keyed history
         speaker = chat_id
 
-    history = agent_histories.get(speaker, [])
+    history = get_history(speaker)
 
     try:
         result = chat(text, history, speaker=speaker)
@@ -112,10 +127,16 @@ def jarvis_handler():
     voice_mode = data.get("voice_mode", False)
     print(f"[Andy Mann] Received: {message[:80]}", flush=True)
  
-    history = agent_histories.get(speaker, [])
+    history = get_history(speaker)
  
     try:
-        result = chat(message, history, speaker=speaker, voice_mode=voice_mode)
+        # Exact task names from Jarvis (a numbered brief item): mark them in
+        # code. Anything else is a conversation for Claude.
+        names = data.get("params", {}).get("complete_tasks")
+        if names:
+            result = complete_tasks(names)
+        else:
+            result = chat(message, history, speaker=speaker, voice_mode=voice_mode)
         response_text = result["response_text"]
         update_history(speaker, message, response_text)
         print(f"[Andy Mann] status={result['status']} | {response_text[:80]}", flush=True)
@@ -147,16 +168,6 @@ def refresh_cache():
     return jsonify({"status": "ok", "message": "Cache refreshed"})
  
  
-def daily_check():
-    print("Running daily maintenance check...", flush=True)
-    message = build_daily_message()
-    if message:
-        send_to_all(message)
-        print("Daily reminder sent!", flush=True)
-    else:
-        print("No tasks due soon.", flush=True)
- 
- 
 def weather_check():
     print("Running weather check...", flush=True)
     messages = build_weather_messages()
@@ -168,9 +179,8 @@ def weather_check():
  
  
 scheduler = BackgroundScheduler(timezone=TIMEZONE)
-# Daily maintenance list is NOT sent directly anymore — it now reaches Gio/Kenz
-# through Jarvis's morning brief (get_morning_data pulls andy_mann's tasks).
-# scheduler.add_job(daily_check, "cron", hour=8, minute=0)
+# Due tasks reach Gio/Kenz through Jarvis's morning brief (it pulls
+# andy_mann's tasks), not a separate Andy Mann message.
 scheduler.add_job(weather_check, "cron", hour=7, minute=0)
 scheduler.add_job(weather_check, "cron", hour=19, minute=0)
 scheduler.start()

@@ -140,9 +140,6 @@ def install_stubs():
         _module("googleapiclient").__path__ = []
         _module("googleapiclient.discovery", build=lambda *a, **k: None)
 
-    if _missing("dateutil.relativedelta"):
-        _module("dateutil").__path__ = []
-        _module("dateutil.relativedelta", relativedelta=lambda **k: None)
 
 
 def have(name):

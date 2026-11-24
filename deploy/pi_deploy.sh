@@ -38,10 +38,23 @@ declare -A PORT=(
   [ray_mote]=5007
 )
 
+# Optional agents (Ray Mote, Miles Ahead, …) run only when listed in
+# registry.json: delete an agent's entry there to leave it out. The central
+# service (jarvis) always runs.
+wanted() {
+  [ "$1" = jarvis ] || grep -q "\"id\": *\"$1\"" "$REPO/registry.json"
+}
+
 # 4. generate + install a user systemd unit per agent
 for name in "${!PORT[@]}"; do
   dir="$AGENTS/$name"
   [ -d "$dir" ] || { echo "[deploy] SKIP $name (missing $dir)"; continue; }
+  if ! wanted "$name"; then
+    # not in registry.json: make sure an earlier install isn't left running
+    systemctl --user disable --now "jarvis-$name" >/dev/null 2>&1 || true
+    echo "[deploy] SKIP $name (not in registry.json)"
+    continue
+  fi
   [ -f "$dir/.env" ] || echo "[deploy] WARNING: $dir/.env missing — $name will error until you add it"
   cat > "$UNIT_DIR/jarvis-$name.service" <<EOF
 [Unit]
@@ -72,7 +85,7 @@ done
 # 5. reload + (re)start
 systemctl --user daemon-reload
 for name in "${!PORT[@]}"; do
-  [ -d "$AGENTS/$name" ] || continue
+  [ -d "$AGENTS/$name" ] && wanted "$name" || continue
   systemctl --user enable --now "jarvis-$name" >/dev/null 2>&1 || true
   systemctl --user restart "jarvis-$name" \
     && echo "[deploy] started jarvis-$name" \
@@ -90,7 +103,7 @@ fi
 echo ""
 echo "[deploy] done. Local health check (agents can take ~10-20s to boot on a Pi):"
 for name in andy_mann drew_parture shawn_ping will_due miles_ahead jarvis ray_mote; do
-  [ -d "$AGENTS/$name" ] || continue
+  [ -d "$AGENTS/$name" ] && wanted "$name" || continue
   p=${PORT[$name]}
   printf "  %-13s :%s -> " "$name" "$p"
   reply=""

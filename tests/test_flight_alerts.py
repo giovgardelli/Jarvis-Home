@@ -117,7 +117,7 @@ class SouthwestTitleParsing(unittest.TestCase):
         with isolated_modules(path=os.path.join(AGENTS, "drew_parture"), drop=("calendar_reader",)):
             cal = load_file(os.path.join(AGENTS, "drew_parture", "calendar_reader.py"), "drew_calendar_under_test")
         return cal.parse_southwest_flight({"summary": title, "description": description,
-                                           "start": {"dateTime": "2026-10-05T08:00:00-07:00"}, "end": {}})
+                                           "start": {"dateTime": "2025-05-19T08:00:00-07:00"}, "end": {}})
 
     def test_destination_from_city_or_code_no_guessed_origin(self):
         f = self.parse("Southwest WN 1234 to San Francisco")
@@ -145,7 +145,7 @@ class NextFlightAnswer(unittest.TestCase):
 
     def parse(self, cal, title, description=""):
         return cal.parse_flight_from_event({"summary": title, "description": description,
-                                            "start": {"dateTime": "2026-10-06T07:45:00-07:00"}, "end": {}})
+                                            "start": {"dateTime": "2025-05-20T07:45:00-07:00"}, "end": {}})
 
     def test_alaska_event_gives_airline_name_number_and_destination(self):
         cal, _ = self.load()

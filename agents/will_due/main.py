@@ -1,6 +1,10 @@
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 import os
+from datetime import datetime
+from jarvis_core.config import TIMEZONE
+
+import pytz
 import requests
 
 load_dotenv()
@@ -15,10 +19,12 @@ GIO_CHAT_ID = os.getenv("GIO_CHAT_ID", "")
 KENZ_CHAT_ID = os.getenv("KENZ_CHAT_ID", "")
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
+PT = pytz.timezone(TIMEZONE)
 MAX_HISTORY = 6  # 3 exchanges
 
 # Shared conversation history keyed by speaker ("gio" or "kenz")
 agent_histories = {"gio": [], "kenz": []}
+history_day = {}      # speaker -> the date its history is from
 
 
 def get_speaker(chat_id):
@@ -37,8 +43,18 @@ def get_sender_name(chat_id):
     return "Unknown"
 
 
+def get_history(speaker):
+    """Today's exchanges only. The history carries no dates, so yesterday's
+    "marked X as done" would read as current and can contradict the data."""
+    today = datetime.now(PT).date()
+    if history_day.get(speaker) != today:
+        history_day[speaker] = today
+        agent_histories[speaker] = []
+    return agent_histories[speaker]
+
+
 def update_history(speaker, user_message, assistant_reply):
-    history = agent_histories.get(speaker, [])
+    history = get_history(speaker)
     history.append({"role": "user", "content": user_message})
     history.append({"role": "assistant", "content": assistant_reply})
     if len(history) > MAX_HISTORY:
@@ -87,7 +103,7 @@ def handle_telegram_update(update):
     if not speaker:
         return
 
-    history = agent_histories.get(speaker, [])
+    history = get_history(speaker)
 
     try:
         result = process_message(text, sender_name, chat_id, history)
@@ -116,7 +132,7 @@ def jarvis_handler():
     voice_mode = data.get("voice_mode", False)
     print(f"[Will Due] Received: {message[:80]}", flush=True)
 
-    history = agent_histories.get(speaker, [])
+    history = get_history(speaker)
 
     try:
         result = process_message(message, sender_name, chat_id, history, voice_mode=voice_mode)

@@ -45,6 +45,16 @@ quality is poor).
 Port **5001**. Part of "what are my priorities" together with Will Due.
 Sensitivity tier: **household**.
 
+**Ticking off from the morning brief** ("1 done"): Jarvis sends the exact task
+name (`complete_tasks`), and Andy marks it in the sheet directly — no Claude
+call. Free-form completions ("I cleaned the gutters") still go through Claude,
+which can only confirm what the sheet actually took: if the update fails, the
+reply says nothing was marked.
+
+**Conversation history** (last 3 exchanges, used for follow-ups) starts fresh
+each day: it carries no dates, so yesterday's "marked X as done" would read as
+current. The sheet is the truth about what's done.
+
 ## Files
 
 `agent.py` · `sheets.py` · `weather.py`, `weather_triggers.py` (alerts) ·

@@ -1,7 +1,7 @@
 """
 llm.py — the Claude model Jarvis uses, and how its replies are read.
 
-One setting for every Claude call (router, agents, brief):
+One setting for every Claude call (router, agents, brief, memory):
   CLAUDE_MODEL in ~/.jarvis_env (default claude-haiku-5-5).
   To go back to the previous model, set it to the Haiku 4.5 ID given in
   docs/hardware-and-costs.md ("Models"). (The ID isn't written here because
@@ -9,8 +9,8 @@ One setting for every Claude call (router, agents, brief):
 
 Haiku 5.5 notes (they also work unchanged on Haiku 4.5):
   - It "thinks" by default, which adds delay. Spoken and interactive calls
-    turn thinking off (fast()), matching how Haiku 4.5 always ran. A
-    background job nobody waits on can leave it on for better answers.
+    turn thinking off (fast()), matching how Haiku 4.5 always ran. Only
+    background jobs (nightly memory learning) let it think.
   - A reply can start with a (hidden) thinking block, so the answer is read
     from the text blocks (text()), never from content[0].
   - It can occasionally decline a request (stop_reason "refusal"); text()

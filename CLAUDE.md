@@ -23,3 +23,21 @@ See README.md for the architecture and docs/ for guides.
 - Runtime paths come from `jarvis_core/config.py` (`JARVIS_HOME`, default ~).
 - Docs live in `README.md`, `docs/` and each `agents/<name>/README.md` — keep
   them in step with behaviour changes.
+- **Nothing personal in this repo.** It's public: examples and tests use
+  made-up facts, dates, flights and places. Real ones belong only in a
+  household's own copy (`household.json` names are the shared example).
+- Optional agents run only when listed in `registry.json` (the router and
+  `deploy/pi_deploy.sh` both check it). Optional behaviours are settings that
+  default off rather than deleted code (`JARVIS_ACKS`, `VOICE_ID_ENABLED`,
+  `LOCAL_STT`); the routing classifier defaults to shadow mode.
+- Local experiments (docs/going-local.md): the routing classifier and Moonshine
+  speech-to-text run in shadow mode first; `python3 -m jarvis_core.shadow_report`
+  decides when to switch.
+- Household memory (`jarvis_core/memory.py`, docs/household-memory.md): learned
+  nightly at 3:30am from an inbox that is then deleted; secrets are filtered in
+  code. The background voice guess only files facts — it must never gate or
+  change an answer.
+- `~/.jarvis_env` lines that a script writes use `export VAR=...`, so they
+  reach a service whether it loads the file with `set -a` or plain `source`.
+- Music (`music_player.py`, docs/music.md) plays through the `jarvis` ALSA
+  mixing device set up by `deploy/setup_music.sh`; Jarvis's own sounds duck it.

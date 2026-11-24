@@ -1,8 +1,7 @@
 import os
 import gspread
 from google.oauth2.credentials import Credentials
-from datetime import date, datetime, timedelta
-from dateutil.relativedelta import relativedelta
+from datetime import date, datetime
 
 _cache = {
     "property_profile": None,
@@ -61,16 +60,6 @@ def format_date_for_sheet(date_str):
     except:
         return date_str
 
-def parse_date(date_str):
-    if not date_str or str(date_str).strip() == "":
-        return None
-    for fmt in ("%m/%d/%Y", "%Y-%m-%d"):
-        try:
-            return datetime.strptime(str(date_str).strip(), fmt).date()
-        except:
-            continue
-    return None
-
 def get_default_notice_days(frequency_value, frequency_unit):
     try:
         value = int(frequency_value)
@@ -127,39 +116,6 @@ def get_tasks():
     if _cache["task_library"] is None:
         _load_cache("task_library")
     return _cache["task_library"]
-
-def get_tasks_with_due_dates():
-    tasks = get_tasks()
-    today = date.today()
-    enriched = []
-    for task in tasks:
-        freq_value = task.get("Frequency Value", 1)
-        freq_unit = task.get("Frequency Unit", "months")
-        last_completed = task.get("Last Completed", "")
-        next_due_raw = task.get("Next Due", "")
-        next_due = parse_date(str(next_due_raw)) if next_due_raw else None
-        if not next_due:
-            continue
-        days_until = (next_due - today).days
-        notice_raw = task.get("Reminder Notice (Days)", "")
-        if notice_raw == "" or notice_raw is None:
-            notice_days = get_default_notice_days(freq_value, freq_unit)
-        else:
-            try:
-                notice_days = int(notice_raw)
-            except:
-                notice_days = get_default_notice_days(freq_value, freq_unit)
-        entry = dict()
-        entry["Task"] = task["Task"]
-        entry["System"] = task["System"]
-        entry["Frequency Value"] = freq_value
-        entry["Frequency Unit"] = freq_unit
-        entry["Last Completed"] = last_completed
-        entry["Next Due"] = next_due.isoformat()
-        entry["Days Until Due"] = days_until
-        entry["Reminder Notice (Days)"] = notice_days
-        enriched.append(entry)
-    return enriched
 
 def update_last_completed(task_name, completed_date=None):
     sheet = get_sheet().worksheet("Task_Library")
@@ -261,22 +217,6 @@ def get_warranties():
     if _cache["warranties"] is None:
         _load_cache("warranties")
     return _cache["warranties"]
-
-def get_expiring_warranties(days_ahead=90):
-    warranties = get_warranties()
-    today = date.today()
-    expiring = []
-    for w in warranties:
-        expiry = w.get("Expiry Date", "")
-        if not expiry or str(expiry).lower() == "lifetime":
-            continue
-        expiry_date = parse_date(str(expiry))
-        if expiry_date:
-            days_until = (expiry_date - today).days
-            if days_until <= days_ahead:
-                w["Days Until Expiry"] = days_until
-                expiring.append(w)
-    return expiring
 
 def add_warranty(item, category, purchase_date, warranty_years, model="", serial="", cost="", vendor="", notes=""):
     sheet = get_sheet().worksheet("Warranties")

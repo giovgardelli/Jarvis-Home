@@ -9,6 +9,7 @@ Runs:
        - 7:00am  morning briefing (was POST /morning-briefing)
        - 6:30am  Google auth health check (was POST /auth-check)
        - 6:40am  AI model deprecation/upgrade check, every 14 days (model_watch.py)
+       - 3:30am  household memory: learn from yesterday's exchanges (jarvis_core/memory.py)
 
 State is persisted to local SQLite (see state.py). Its routing brain
 (jarvis_core/router.py, via agent.py) dispatches to the other agents at 127.0.0.1:500x
@@ -27,6 +28,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from main import app, handle_telegram_update, run_morning_briefing, check_google_auth, TELEGRAM_TOKEN
 from model_watch import maybe_run_model_watch
+from jarvis_core import memory
 
 DEFAULT_PORT = 5006  # jarvis (central)
 PT = pytz.timezone(TIMEZONE)
@@ -38,8 +40,19 @@ def _start_scheduler():
     sched.add_job(check_google_auth, "cron", hour=6, minute=30)
     # Runs the model check when 14+ days have passed; result goes in the 7am brief
     sched.add_job(maybe_run_model_watch, "cron", hour=6, minute=40)
+    sched.add_job(learn_overnight, "cron", hour=3, minute=30)
     sched.start()
-    print("[pi_run] Jarvis scheduler started (briefing 7am, auth-check 6:30am, model-watch 6:40am).", flush=True)
+    print("[pi_run] Jarvis scheduler started (briefing 7am, auth-check 6:30am, model-watch 6:40am, "
+          "memory 3:30am).", flush=True)
+
+
+def learn_overnight():
+    """Household memory: distil yesterday's exchanges into facts (new ones are
+    listed in the 7am brief). On failure the inbox is kept for tomorrow."""
+    try:
+        memory.consolidate()
+    except Exception as e:
+        print(f"[Memory] Overnight learning failed, will retry tomorrow: {e}", flush=True)
 
 
 if __name__ == "__main__":
