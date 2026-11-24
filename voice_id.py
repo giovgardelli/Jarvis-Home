@@ -124,8 +124,8 @@ def identify(audio_bytes: bytes, sample_rate: int = 16000) -> dict:
     best_score = scores[best_speaker]
 
     if best_score >= SIMILARITY_CONFIRMED:
-        return {"status": "confirmed", "speaker": best_speaker, "score": best_score}
+        return {"status": "confirmed", "speaker": best_speaker, "score": best_score, "scores": scores}
     elif best_score >= SIMILARITY_UNCERTAIN:
-        return {"status": "uncertain", "speaker": best_speaker, "score": best_score}
+        return {"status": "uncertain", "speaker": best_speaker, "score": best_score, "scores": scores}
     else:
-        return {"status": "unauthorized", "speaker": None, "score": best_score}
+        return {"status": "unauthorized", "speaker": None, "score": best_score, "scores": scores}

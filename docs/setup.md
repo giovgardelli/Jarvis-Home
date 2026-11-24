@@ -137,8 +137,9 @@ systemctl --user daemon-reload && systemctl --user enable --now jarvis
 loginctl enable-linger "$USER"     # keep user services running without a login
 ```
 
-Generate the short "on it" chimes (played while Jarvis works) in your chosen
-voice — they go to `~/acks/`:
+Optional: the short "on it" clips played while Jarvis works are off by
+default (`JARVIS_ACKS=on` in `~/.jarvis_env` turns them on). To use them,
+generate them in your chosen voice — they go to `~/acks/`:
 
 ```bash
 set -a && source ~/.jarvis_env && set +a && ~/jarvis-env/bin/python agents/jarvis/generate_acks.py
@@ -170,12 +171,24 @@ journalctl --user -u jarvis -f            # voice loop
 journalctl --user -u jarvis-will_due -f   # an agent
 ```
 
+Logs and reboots: Raspberry Pi OS keeps logs in memory by default, so
+`journalctl --user` says "No journal files were found" and every reboot
+clears the history. Save logs to disk once (size is capped automatically):
+
+```bash
+sudo mkdir -p /var/log/journal && sudo systemctl restart systemd-journald
+```
+
+Until then, read a service's logs with
+`journalctl _SYSTEMD_USER_UNIT=jarvis.service` (or `jarvis-<name>.service`).
+
 ## Troubleshooting
 
 | Symptom | Look at |
 |---|---|
 | An agent shows "no response" after deploy | `journalctl --user -u jarvis-<name> -n 40` — usually a missing key in its `.env` |
 | Every request: "Sorry, I didn't manage to process that" | `journalctl --user -u jarvis -n 50` for `[Router] Haiku routing error` — check `ANTHROPIC_API_KEY` |
+| `journalctl --user`: "No journal files were found" | Logs are in memory only — see "Logs and reboots" above |
 | Sheets agents stop working after a week | OAuth app still in "Testing" — see step 3 |
 | No sound | `aplay -l`, then set `JARVIS_AUDIO_OUT` (e.g. `hw:1,0`) |
 | "Audio device not found" | `arecord -l`, then set `JARVIS_MIC_NAME` to part of the mic's name |

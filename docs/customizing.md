@@ -15,6 +15,7 @@ to "edit a prompt".
 | Web-answer model | `GEMINI_MODEL` |
 | Radio presets ("play some jazz") | `stations.json` — see [music.md](music.md) |
 | Voice ID on/off and thresholds | `VOICE_ID_ENABLED`, `VOICE_ID_CONFIRMED`, `VOICE_ID_UNCERTAIN` — see [voice-id.md](voice-id.md) |
+| Local routing classifier / local speech-to-text | `ROUTER_CLASSIFIER`, `LOCAL_STT` — see [going-local.md](going-local.md) |
 
 `household.json` example:
 

@@ -12,6 +12,8 @@ def classify(r, text, last_full=OFFERED_MORE):
         return "text_me"
     if r._is_hear_more(text, last_full):
         return "hear_more"
+    if r.memory.is_command(text):
+        return "memory"
     if r._is_timer_request(text):
         return "timer"
     if r._is_music_request(text):
@@ -98,6 +100,25 @@ CASES = {
     # explicit search phrasing goes straight to Gemini
     "search for the best pizza in LA": "web",
     "who won the Lakers game": "web",
+    # household memory: explicit commands only; reminders and "forget it" are not
+    "remember that our team is the Mariners": "memory",
+    "Jarvis, please remember that Kenz's aunt visits on Friday": "memory",
+    "remember to call the plumber": "haiku",
+    "Jarvis remember Kenz's birthday is September 14th": "memory",
+    "remember: the wifi router is in the hall closet": "memory",
+    "can you remember that Gio hates olives": "memory",
+    "remember when we went to Lisbon": "haiku",
+    "remember this": "haiku",
+    "Jarvis, tell me everything you know about my family": "memory",
+    "tell me what you remember": "memory",
+    "do you remember the plumber's name": "haiku",
+    "what do you remember about us": "memory",
+    "Jarvis, what have you learned": "memory",
+    "what do you remember about the plumber": "haiku",
+    "what do you know about black holes": "web",
+    "forget that our team is the Mariners": "memory",
+    "forget it": "haiku",
+    "never mind, forget about it": "haiku",
     # thermostat (Ray Mote): control and indoor questions only
     "set upstairs to 70": "ray_mote",
     "set the heat to 72": "ray_mote",

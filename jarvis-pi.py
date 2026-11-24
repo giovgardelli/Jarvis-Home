@@ -19,7 +19,7 @@ from openwakeword.model import Model
 import pytz
 from jarvis_core.router import route as router_route
 from jarvis_core.voice import expects_reply
-from jarvis_core.config import VOICE_ID_ENABLED
+from jarvis_core.config import VOICE_ID_ENABLED, ACKS_ENABLED
 from voice_id import identify as voice_id_identify
 from voice_id import warmup as voice_id_warmup
 if VOICE_ID_ENABLED:
@@ -29,6 +29,21 @@ from jarvis_core.config import PLAYBACK_DEVICE, MIC_NAME, home_path, wakeword_mo
 from jarvis_core import household
 PEOPLE_KEYTERMS = [f"{name}:5" for name in household.keyterms()]
 _executor = ThreadPoolExecutor(max_workers=2)
+# Local speech-to-text shadow runs here, one at a time, after Jarvis has answered
+_shadow_executor = ThreadPoolExecutor(max_workers=1)
+from jarvis_core import local_stt
+from jarvis_core import memory
+
+# Household memory (jarvis_core/memory.py) — each exchange is queued for the
+# nightly learning, off the critical path. While voice ID is switched off for
+# answering, it still runs in the background (after the reply) to make a best
+# guess at who spoke, used only to file a learned fact under that person; an
+# unsure guess files it under the household. MEMORY_VOICE_GUESS=off disables it.
+MEMORY_VOICE_GUESS = (memory.ENABLED and not VOICE_ID_ENABLED
+                      and os.environ.get("MEMORY_VOICE_GUESS", "on").strip().lower() not in ("0", "off", "false", "no"))
+GUESS_MARGIN = 0.05   # best voice must beat the other one by this much
+if MEMORY_VOICE_GUESS:
+    threading.Thread(target=voice_id_warmup, daemon=True).start()
  
 # ── Config ────────────────────────────────────────────────────────────────────
 JARVIS_BRIEF_URL = "http://127.0.0.1:5006/get-brief-text"
@@ -180,6 +195,9 @@ def speak(text: str):
 
 
 def play_ack():
+    """The "on it" clip while routing runs. Off unless JARVIS_ACKS=on."""
+    if not ACKS_ENABLED:
+        return
     ack_file = random.choice(ACK_FILES)
     if os.path.exists(ack_file):
         play_file(ack_file)
@@ -462,18 +480,66 @@ def _remember(transcript, response_text):
     conversation_history = conversation_history[-MAX_HISTORY:]
 
 
+def _timed(fn, *args):
+    t = time.time()
+    return fn(*args), time.time() - t
+
+
+def _transcribe_local_first(stt_wav):
+    """LOCAL_STT=on: Moonshine on the Pi, Deepgram if it fails or hears nothing."""
+    try:
+        text = local_stt.transcribe(stt_wav)
+        if text:
+            print(f"[LocalSTT] Transcript: {text}", flush=True)
+            return text
+    except Exception as e:
+        print(f"[LocalSTT] Failed, using Deepgram: {e}", flush=True)
+    return transcribe(stt_wav)
+
+
+def _stt_shadow(stt_wav, deepgram_text, deepgram_seconds):
+    """LOCAL_STT=shadow: transcribe the same recording locally and log both."""
+    from jarvis_core.router import offline_decision
+    try:
+        local_text, local_seconds = _timed(local_stt.transcribe, stt_wav)
+        error = ""
+    except Exception as e:
+        local_text, local_seconds, error = "", 0.0, str(e)
+    local_stt.log_shadow(
+        deepgram_text, local_text, deepgram_seconds, local_seconds,
+        offline_decision(deepgram_text) if deepgram_text else "",
+        offline_decision(local_text) if local_text else "",
+        error,
+    )
+
+
 def _handle_command(p, audio_device, t0):
-    """Record → transcribe → route → speak, for one wake-word activation."""
+    """Record → transcribe → route → speak, for one wake-word activation.
+    Afterwards (whatever path the request took) runs the local speech-to-text
+    shadow comparison if LOCAL_STT=shadow."""
+    shadow = {}
+    try:
+        _handle_command_inner(p, audio_device, t0, shadow)
+    finally:
+        if shadow and local_stt.MODE == "shadow":
+            _shadow_executor.submit(_stt_shadow, *shadow["stt"])
+
+
+def _handle_command_inner(p, audio_device, t0, shadow):
     global last_full_response
 
     stt_wav, id_wav = prepare_audio(record_command(p, audio_device))
     print(f"[TIMER] Record: {time.time()-t0:.2f}s", flush=True)
 
     t1 = time.time()
-    future_transcript = _executor.submit(transcribe, stt_wav)
+    if local_stt.MODE == "on" and local_stt.available():
+        future_transcript = _executor.submit(_timed, _transcribe_local_first, stt_wav)
+    else:
+        future_transcript = _executor.submit(_timed, transcribe, stt_wav)
     future_voice = _executor.submit(identify_speaker_voice, id_wav)
-    transcript = future_transcript.result()
+    transcript, transcribe_seconds = future_transcript.result()
     voice_result = future_voice.result()
+    shadow["stt"] = (stt_wav, transcript, transcribe_seconds)
     print(f"[TIMER] Transcribe+VoiceID parallel: {time.time()-t1:.2f}s", flush=True)
     print(f"[Deepgram] Transcript: {transcript}", flush=True)
     print(f"[VoiceID] {voice_result}", flush=True)
@@ -508,7 +574,8 @@ def _handle_command(p, audio_device, t0):
             return
 
     # Start routing right away and play the ack while it runs (the ack used
-    # to finish before routing even began)
+    # to finish before routing even began). The ack is off by default
+    # (JARVIS_ACKS); routing still starts here either way.
     t2 = time.time()
     future_result = _executor.submit(
         router_route,
@@ -552,6 +619,8 @@ def _handle_command(p, audio_device, t0):
             print(f"[TIMER] Speak (streamed TTS + playback): {time.time()-t3:.2f}s", flush=True)
 
     print(f"[TIMER] Total: {time.time()-t0:.2f}s", flush=True)
+    if response_text:
+        _shadow_executor.submit(_record_for_memory, transcript, response_text, id_wav, voice_result)
 
     # Follow-up window only when Jarvis asked something it needs answered
     # (not after statements or "anything else?" — it would pick up the room)
@@ -588,8 +657,34 @@ def _handle_command(p, audio_device, t0):
                 if followup_response:
                     _remember(followup_transcript, followup_response)
                     speak(followup_response)
+                    _shadow_executor.submit(_record_for_memory, followup_transcript,
+                                            followup_response, id_wav, followup_voice)
         except Exception as e:
             print(f"[Follow-up] Error: {e}", flush=True)
+
+
+def _guess_speaker(id_wav):
+    """Background best guess at who spoke (for filing memories), or None."""
+    try:
+        r = voice_id_identify(id_wav, SAMPLE_RATE)
+    except Exception as e:
+        print(f"[Memory] Voice guess error: {e}", flush=True)
+        return None
+    scores = sorted((r.get("scores") or {}).values(), reverse=True)
+    clear_winner = len(scores) < 2 or scores[0] - scores[1] >= GUESS_MARGIN
+    guess = r.get("speaker") if r.get("status") == "confirmed" and clear_winner else None
+    print(f"[Memory] Voice guess: {guess or 'unsure'} ({r.get('status')}, {r.get('score', 0):.2f})", flush=True)
+    return guess
+
+
+def _record_for_memory(transcript, reply, id_wav, voice_result):
+    """Queue the exchange for tonight's learning (runs after the reply)."""
+    if not memory.ENABLED:
+        return
+    speaker = voice_result.get("speaker") if voice_result.get("status") == "confirmed" else None
+    if speaker is None and MEMORY_VOICE_GUESS and not memory.is_command(transcript):
+        speaker = _guess_speaker(id_wav)
+    memory.record_exchange(transcript, reply, "voice", speaker)
 
 
 def _play_gate(gate, text=""):
@@ -660,6 +755,10 @@ def main():
         synthesize_fn=synthesize
     )
     music_player.init()
+
+    if local_stt.MODE in ("shadow", "on"):
+        # load the local speech model in the background so timings stay fair
+        threading.Thread(target=local_stt.warmup, daemon=True).start()
 
     print("Loading wake word model...", flush=True)
     oww_model = Model(wakeword_model_paths=[wakeword_model_path()])

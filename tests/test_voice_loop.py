@@ -218,6 +218,38 @@ class MusicDucking(unittest.TestCase):
         self.assertEqual(jp.APLAY_CMD[-1], jp.PLAYBACK_DEVICE)
 
 
+class Acks(unittest.TestCase):
+    def test_off_by_default_and_switchable(self):
+        jp = voice_loop()
+        played = []
+        saved = (jp.ACKS_ENABLED, jp.play_file, jp.ACK_FILES)
+        jp.play_file = played.append
+        jp.ACK_FILES = [__file__]                  # any file that exists
+        try:
+            jp.ACKS_ENABLED = False
+            jp.play_ack()
+            self.assertEqual(played, [], "no clip while off")
+            jp.ACKS_ENABLED = True
+            jp.play_ack()
+            self.assertEqual(played, [__file__])
+        finally:
+            jp.ACKS_ENABLED, jp.play_file, jp.ACK_FILES = saved
+
+    def test_setting(self):
+        import importlib
+        from jarvis_core import config
+        saved = os.environ.pop("JARVIS_ACKS", None)
+        try:
+            self.assertFalse(importlib.reload(config).ACKS_ENABLED)
+            os.environ["JARVIS_ACKS"] = "on"
+            self.assertTrue(importlib.reload(config).ACKS_ENABLED)
+        finally:
+            os.environ.pop("JARVIS_ACKS", None)
+            if saved is not None:
+                os.environ["JARVIS_ACKS"] = saved
+            importlib.reload(config)
+
+
 class VoiceIdSwitch(unittest.TestCase):
     def test_off_means_default_speaker_and_no_analysis(self):
         jp = voice_loop()
@@ -292,6 +324,33 @@ class AudioForVoiceId(unittest.TestCase):
                 return wf.getnchannels(), np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16).tolist()
         self.assertEqual(read(vid), (2, [3000, 9000, -6000, -12000, 32767, 32767]))
         self.assertEqual(read(stt), (1, [6000, -9000, 32767]))
+
+
+
+class MemoryVoiceGuess(unittest.TestCase):
+    """With voice ID off, a background guess only files memories — under a
+    person when the match is confident and clear, else under the household."""
+
+    def test_guess_needs_confirmed_and_a_clear_winner(self):
+        jp = voice_loop()
+        saved = (jp.voice_id_identify, jp.MEMORY_VOICE_GUESS, jp.memory.record_exchange)
+        recorded = []
+        jp.memory.record_exchange = lambda text, reply, channel, speaker=None: recorded.append(speaker)
+        jp.MEMORY_VOICE_GUESS = True
+        try:
+            for result, want in [
+                ({"status": "confirmed", "speaker": "kenz", "score": 0.85, "scores": {"kenz": 0.85, "gio": 0.7}}, "kenz"),
+                ({"status": "confirmed", "speaker": "kenz", "score": 0.80, "scores": {"kenz": 0.80, "gio": 0.78}}, None),
+                ({"status": "uncertain", "speaker": "gio", "score": 0.75, "scores": {"gio": 0.75, "kenz": 0.6}}, None),
+            ]:
+                jp.voice_id_identify = lambda wav, rate, r=result: r
+                jp._record_for_memory("we're out of oat milk", "Added.", b"wav", {"status": "disabled"})
+                self.assertEqual(recorded[-1], want, result)
+            jp.voice_id_identify = lambda wav, rate: (_ for _ in ()).throw(RuntimeError("no model"))
+            jp._record_for_memory("hi", "Hello.", b"wav", {"status": "disabled"})
+            self.assertIsNone(recorded[-1], "a failed guess still records, under the household")
+        finally:
+            jp.voice_id_identify, jp.MEMORY_VOICE_GUESS, jp.memory.record_exchange = saved
 
 
 if __name__ == "__main__":

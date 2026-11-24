@@ -31,7 +31,10 @@ from datetime import datetime, timedelta
 import pytz
 from concurrent.futures import ThreadPoolExecutor
 
-from jarvis_core import household, llm, state
+from jarvis_core import household, llm, memory, state
+from jarvis_core.config import home_path
+from jarvis_core.intent_classifier import AutoRetraining, training_examples
+from jarvis_core.registry import AGENTS as REGISTRY_AGENTS
 from jarvis_core.registry import access, agent as registry_agent, agent_ids, needs_speaker, routing_lines
 from jarvis_core.voice import NO_COURTESY_QUESTION, split_voice as _split_voice
 
@@ -624,8 +627,10 @@ def _complete_from_brief(numbers, items, speaker, chat_id):
         names = [i["task"] for i in group]
         message = (f"Mark {names[0]} as done" if len(names) == 1
                    else "Mark these as done: " + "; ".join(names))
-        result = dispatch(agent_id, message, {"original_message": message}, speaker,
-                          voice_mode=False, chat_id=chat_id)
+        # complete_tasks: the exact names, so an agent that supports it (Andy
+        # Mann) marks them without a model call; others read the message
+        result = dispatch(agent_id, message, {"original_message": message, "complete_tasks": names},
+                          speaker, voice_mode=False, chat_id=chat_id)
         if result.get("status") == "completed":
             done += group
         else:
@@ -748,7 +753,7 @@ def _truncate_for_voice(text, speaker):
 
 # ── Routing prompt ────────────────────────────────────────────────────────────
 
-def _build_routing_prompt(text, speaker, history, voice_mode=False, task_hint=None):
+def _build_routing_prompt(text, speaker, history, voice_mode=False, task_hint=None, facts=None):
     agents_list = routing_lines() + (
         "\n- gemini_search: general knowledge, current events, news, sports, recipes, how-to, "
         "or any factual question not handled by the agents above")
@@ -766,14 +771,16 @@ def _build_routing_prompt(text, speaker, history, voice_mode=False, task_hint=No
         "You are Jarvis, an intelligent home orchestrator.\n"
         "You are calm, composed, and precise with a subtle British character.\n"
         f"Today is {datetime.now(PT).strftime('%A %B %d, %Y')}.\n\n"
-        + history_text +
+        + history_text
+        + memory.prompt_block(facts or []) +
         "The speaker is: " + address + " (" + speaker + ")\n\n"
         "Available agents:\n" + agents_list + "\n\n"
         + hint +
         'The user said: "' + text + '"\n\n'
         "Reply with JSON: agent (an agent id, gemini_search, or jarvis), intent (what the user "
         "wants, in a short sentence), direct_response (your reply if agent is jarvis, else null).\n\n"
-        "Route to 'jarvis' only for greetings, small talk, or questions about Jarvis himself.\n"
+        "Route to 'jarvis' only for greetings, small talk, questions about Jarvis himself, or "
+        "questions about the household answered by the facts above.\n"
         "Route to 'gemini_search' for general knowledge or current events questions.\n"
         "For everything else pick the most specific agent.\n"
         + ("If agent is 'jarvis', write direct_response as one or two natural spoken sentences — no markdown. "
@@ -885,8 +892,9 @@ def _handle_music(text: str) -> str:
 _gemini_client = None
 
 
-def _web_search(query, speaker, voice_mode=True):
-    """Answer with Gemini + Google Search grounding."""
+def _web_search(query, speaker, voice_mode=True, facts=None):
+    """Answer with Gemini + Google Search grounding. `facts`: household memory
+    marked web_ok, used only to make a vague question specific."""
     global _gemini_client
     try:
         from google import genai
@@ -897,9 +905,14 @@ def _web_search(query, speaker, voice_mode=True):
         style = ("2-3 short spoken sentences. No markdown, no bullets, just natural speech, "
                  "and don't end with a question"
                  if voice_mode else "2-3 short sentences. No markdown, no bullets, just natural conversational text")
+        context = ""
+        if facts:
+            context = ("\n\nAbout the household (use only to make a vague question specific — "
+                       "e.g. which team, which city, which store — and don't mention it otherwise):\n"
+                       + "\n".join(f"- {f['fact']}" for f in facts))
         response = _gemini_client.models.generate_content(
             model=os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite"),
-            contents=f"Answer this question for {_address(speaker)} in {style}: {query}",
+            contents=f"Answer this question for {_address(speaker)} in {style}: {query}{context}",
             config=types.GenerateContentConfig(
                 tools=[types.Tool(google_search=types.GoogleSearch())]
             )
@@ -910,8 +923,11 @@ def _web_search(query, speaker, voice_mode=True):
         return "I wasn't able to find an answer to that right now."
 
 
-def _search(text, speaker, voice_mode):
-    return _web_search(text, speaker) if voice_mode else _web_search(text, speaker, False)
+def _search(text, speaker, voice_mode, people=()):
+    facts = memory.relevant(text, people, web_only=True)
+    if facts:
+        print(f"[Memory] Web context: {[f['fact'] for f in facts]}", flush=True)
+    return _web_search(text, speaker, voice_mode, facts)
 
 
 # ── Merge multi-agent responses ───────────────────────────────────────────────
@@ -1047,13 +1063,92 @@ def _local_route(text: str) -> str | None:
     return None  # Fall through to Haiku
 
 
-def _route_with_haiku(text, speaker, history, voice_mode, task_hint=None):
+# ── Local routing classifier ──────────────────────────────────────────────────
+# A small model trained on your own routing_log.csv (jarvis_core/intent_classifier.py).
+#   ROUTER_CLASSIFIER=shadow (default): it guesses, Claude still decides, and
+#       both are logged to router_shadow.csv for `python3 -m jarvis_core.shadow_report`
+#   ROUTER_CLASSIFIER=on: confident guesses skip the Claude routing call
+#       (faster, same privacy); everything else still goes to Claude
+#   ROUTER_CLASSIFIER=off
+CLASSIFIER_MODE = os.environ.get("ROUTER_CLASSIFIER", "shadow").strip().lower()
+CLASSIFIER_MIN_CONFIDENCE = float(os.environ.get("ROUTER_CLASSIFIER_MIN_CONFIDENCE", "0.9"))
+CLASSIFIER_MIN_SIMILARITY = float(os.environ.get("ROUTER_CLASSIFIER_MIN_SIMILARITY", "0.5"))
+ROUTING_LOG_PATH = home_path("routing_log.csv")
+ROUTER_SHADOW_PATH = home_path("router_shadow.csv")
+
+
+def keyword_label(text):
+    """Where today's keyword rules send a request (an agent / gemini_search), or None."""
+    if _is_web_search(text):
+        return "gemini_search"
+    return _local_route(text)
+
+
+def _classifier_labels():
+    return agent_ids() + ["gemini_search", "jarvis"]
+
+
+classifier = AutoRetraining(
+    lambda: ROUTING_LOG_PATH,
+    lambda: training_examples(ROUTING_LOG_PATH, REGISTRY_AGENTS, set(_classifier_labels()), keyword_label),
+)
+
+
+def _classifier_trusted(prediction):
+    label, confidence, similarity = prediction
+    # "jarvis" (small talk) needs Claude to write the reply, so never skip it
+    return (label not in (None, "jarvis")
+            and confidence >= CLASSIFIER_MIN_CONFIDENCE
+            and similarity >= CLASSIFIER_MIN_SIMILARITY)
+
+
+def _log_router_shadow(text, prediction, claude_agent):
+    import csv
+    label, confidence, similarity = prediction
+    try:
+        new = not os.path.exists(ROUTER_SHADOW_PATH)
+        with open(ROUTER_SHADOW_PATH, "a", newline="") as f:
+            w = csv.writer(f)
+            if new:
+                w.writerow(["timestamp", "text", "predicted", "confidence", "similarity", "claude_agent"])
+            w.writerow([datetime.now(PT).isoformat(), text, label or "", f"{confidence:.3f}",
+                        f"{similarity:.3f}", claude_agent])
+    except Exception as e:
+        print(f"[Router] Shadow log error: {e}", flush=True)
+
+
+def offline_decision(text):
+    """Where a request would go without any cloud call: keyword rules, then the
+    classifier's best guess. Used to compare transcripts (speech-to-text shadow)."""
+    if _is_timer_request(text):
+        return "timer"
+    if _is_music_request(text):
+        return "music"
+    if _is_multi_agent(text):
+        return "multi"
+    return keyword_label(text) or classifier.predict(text)[0] or "unknown"
+
+
+def _route_with_haiku(text, speaker, history, voice_mode, task_hint=None, facts=None):
     """Returns (agent_id, intent, direct_response, method)."""
     local_agent = _local_route(text)
     if local_agent:
         print(f"[Router] Local route → {local_agent}", flush=True)
         _log_routing_decision(text, local_agent, "local")
         return local_agent, text, None, "local"
+
+    prediction = None
+    if CLASSIFIER_MODE in ("shadow", "on"):
+        try:
+            prediction = classifier.predict(text)
+        except Exception as e:
+            print(f"[Router] Classifier error: {e}", flush=True)
+    if (CLASSIFIER_MODE == "on" and prediction and not task_hint
+            and _classifier_trusted(prediction)):
+        label, confidence, _ = prediction
+        print(f"[Router] Classifier route → {label} (confidence {confidence:.2f})", flush=True)
+        _log_routing_decision(text, label, "classifier")   # not used for training
+        return label, text, None, "classifier"
 
     print("[Router] Local route miss → calling Haiku", flush=True)
     t_haiku = time.time()
@@ -1062,7 +1157,8 @@ def _route_with_haiku(text, speaker, history, voice_mode, task_hint=None):
             model=ROUTER_MODEL,
             max_tokens=300,
             messages=[{"role": "user", "content": _build_routing_prompt(
-                text, speaker, history=history, voice_mode=voice_mode, task_hint=task_hint)}],
+                text, speaker, history=history, voice_mode=voice_mode, task_hint=task_hint,
+                facts=facts)}],
             extra_body=llm.fast(_structured(_routing_schema())),
         )
         routing = json.loads(llm.text(resp))
@@ -1070,6 +1166,8 @@ def _route_with_haiku(text, speaker, history, voice_mode, task_hint=None):
         intent = routing.get("intent") or text
         print(f"[Router] Haiku route → {agent_name} ({(time.time()-t_haiku)*1000:.0f}ms)", flush=True)
         _log_routing_decision(text, agent_name, "haiku")
+        if prediction is not None:
+            _log_router_shadow(text, prediction, agent_name)
         return agent_name, intent, routing.get("direct_response"), "haiku"
     except Exception as e:
         print(f"[Router] Haiku routing error: {e}", flush=True)
@@ -1109,6 +1207,8 @@ def route(text, speaker, history=None, last_full=None, voice_mode=True,
     # Who the request is for: the known speaker, else a name said in it
     named = _speaker_from_text(text) if speaker is None else None
     owner_known = speaker is not None or named is not None or _mentions_shared(text)
+    # Whose personal memories may be used: who's asking (if known) and who's named
+    people = tuple({speaker, named, _speaker_from_text(text)} - {None})
     speaker = speaker or named or DEFAULT_SPEAKER
 
     try:
@@ -1153,6 +1253,18 @@ def route(text, speaker, history=None, last_full=None, voice_mode=True,
                 response_text = _complete_from_brief(numbers, items, speaker, chat_id)
                 return {"response_text": response_text, "full_response": response_text, "force_text": False}
 
+        # Household memory: "remember that…", "forget…", "what do you remember?"
+        if memory.ENABLED and memory.is_command(text):
+            blocked = _gate("household", voice_status)
+            if blocked:
+                return blocked
+            response_text = memory.handle_command(text, people[0] if len(people) == 1 else None,
+                                                  people, voice_mode)
+            # "What do you know?" by voice reads the latest few; "text me that"
+            # then sends the whole list
+            full = (memory.describe(people) if voice_mode and memory.command(text)[0] == "list"
+                    else response_text)
+            return {"response_text": response_text, "full_response": full, "force_text": False}
 
         # Timers and alarms ring on the Pi speaker only
         if _is_timer_request(text):
@@ -1193,7 +1305,7 @@ def route(text, speaker, history=None, last_full=None, voice_mode=True,
         if _is_web_search(text):
             print("[Router] Web search → Gemini", flush=True)
             _log_routing_decision(text, "gemini_search", "local")
-            response_text = _search(text, speaker, voice_mode)
+            response_text = _search(text, speaker, voice_mode, people)
             return {"response_text": response_text, "full_response": response_text, "force_text": False}
 
         # Completed task? Hint the list it was on in today's brief
@@ -1204,7 +1316,9 @@ def route(text, speaker, history=None, last_full=None, voice_mode=True,
             if task_hint:
                 print(f"[Router] Task found in today's {task_hint} list", flush=True)
 
-        agent_id, intent, direct, method = _route_with_haiku(text, speaker, history, voice_mode, task_hint)
+        facts = memory.relevant(text, people)
+        agent_id, intent, direct, method = _route_with_haiku(text, speaker, history, voice_mode, task_hint,
+                                                             facts)
         params = {"original_message": text}
 
         # Never pretend a failed request succeeded
@@ -1213,7 +1327,7 @@ def route(text, speaker, history=None, last_full=None, voice_mode=True,
                     "full_response": None, "force_text": False}
 
         if agent_id == "gemini_search":
-            response_text = _search(text, speaker, voice_mode)
+            response_text = _search(text, speaker, voice_mode, people)
             return {"response_text": response_text, "full_response": response_text, "force_text": False}
 
         if agent_id in ("none", "null", "", None, "jarvis"):

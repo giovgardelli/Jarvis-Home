@@ -19,7 +19,7 @@ use cloud AI because a Raspberry Pi can't do them fast enough yet.
 | **Wake word detection** (openWakeWord) — nothing is sent until "Hey Jarvis" | **Your spoken command** → Deepgram (speech-to-text) |
 | **Voice prints and voice ID** (Resemblyzer) — never uploaded | **The request text** → Anthropic (routing and replies) |
 | Timers, alarms, LEDs, keyword shortcuts | **Spoken replies** → ElevenLabs (text-to-speech) |
-| Conversation history and state (SQLite file) | **Web questions** → Google Gemini; **radio searches** → Radio Browser (and Anthropic for the closest genre) |
+| Conversation history, state and the **household memory** (SQLite file) — only facts relevant to a request are sent with it ([household-memory.md](household-memory.md)) | **Web questions** → Google Gemini; **radio searches** → Radio Browser (and Anthropic for the closest genre) |
 | All API keys and secrets | **Lists and calendar** → your own Google Sheets / Calendar |
 | The agents themselves (localhost only) | **Telegram messages** → Telegram |
 | The thermostat limits (enforced in code) | **Thermostat commands and readings** → Google Nest |
@@ -33,10 +33,13 @@ data or keep it longer than needed.
 **1. No doors into your home.** The Telegram bots *poll* Telegram for new
 messages instead of receiving webhooks, so you never open a port or expose a
 URL. Each agent's web server listens on `127.0.0.1` only — reachable from the
-Pi itself, not from your network, let alone the internet. The one exception is
-optional: [AirPlay](music.md) makes the speaker visible on your home Wi-Fi
+Pi itself, not from your network, let alone the internet. Two optional
+exceptions: [AirPlay](music.md) makes the speaker visible on your home Wi-Fi
 (still not the internet), so anyone on it can play music to it. Set an AirPlay
-password if that matters.
+password if that matters. And [Pi-hole](../pihole/README.md), if you
+run it: it answers DNS for your home network (port 53) and has a
+password-protected web page on port 8080 — again home network only. It is
+set not to store the website names it looks up ([details](../pihole/README.md#privacy)).
 
 **2. Agents only trust Jarvis.** Requests between Jarvis and the agents carry
 a shared secret (`JARVIS_SECRET`); anything without it is refused.
@@ -96,6 +99,11 @@ Everything that goes to the cloud has a local alternative. The trade-off is
 speed and quality on a Pi; a small mini-PC or a Pi 5 with an accelerator
 narrows it.
 
+**Two are built in as safe experiments** — a local routing classifier and
+local speech-to-text (Moonshine). They run in shadow mode first and you only
+switch them on when a report shows they're no slower and no less accurate:
+see [going-local.md](going-local.md).
+
 | Cloud piece today | Local alternative | Trade-off |
 |---|---|---|
 | Deepgram speech-to-text | [whisper.cpp](https://github.com/ggerganov/whisper.cpp) or faster-whisper | Slower on a Pi; tiny/base models are fast but less accurate |
@@ -115,6 +123,7 @@ what's left.
 - [ ] `JARVIS_SECRET` is long and random
 - [ ] `ALLOWED_CHAT_IDS` is set for every bot
 - [ ] No port forwarding to the Pi on your router; agents bind to `127.0.0.1`
+      (with Pi-hole, never forward port 53 — that makes it a public DNS server)
 - [ ] Decide which agents are `personal` in `registry.json`
 - [ ] If others use the room, consider enabling voice ID (with a decent mic)
 - [ ] Review the retention settings of each AI provider you use

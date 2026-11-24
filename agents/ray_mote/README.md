@@ -67,6 +67,11 @@ routing call); "service the HVAC" and "when is the furnace filter due" still
 go to Andy Mann, and "temperature in Paris" to web search. Sensitivity tier:
 **public**: anyone in the room, guests included, can change the temperature.
 
+**Ray Mote is optional.** No Nest thermostats? Delete the `ray_mote` entry
+from `registry.json` and re-run `deploy/pi_deploy.sh`: Jarvis stops routing
+temperature requests to it, and its service isn't installed (or is stopped, if
+it was).
+
 Ray's own Telegram bot is optional: Jarvis's Telegram bot reaches Ray too. To
 add one, fill the Telegram lines in `.env` ([setup.md §4](../../docs/setup.md#4-telegram-bots)).
 

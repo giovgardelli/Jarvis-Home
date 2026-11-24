@@ -32,6 +32,19 @@ GEMINI_API_KEY=               # web-search answers (also used by the model check
 # Claude model for every call — see docs/hardware-and-costs.md ("Models")
 # CLAUDE_MODEL=claude-haiku-5-5
 
+# Local experiments — see docs/going-local.md
+# ROUTER_CLASSIFIER=shadow         # shadow / on / off
+# ROUTER_CLASSIFIER_MIN_CONFIDENCE=0.9
+# LOCAL_STT=off                    # off / shadow / on (needs Moonshine installed)
+# LOCAL_STT_MODEL=moonshine/base
+
+# Household memory — see docs/household-memory.md
+# MEMORY=on                        # on / off
+# MEMORY_VOICE_GUESS=on            # background voice guess to file facts under a person
+
+# "On it" clip while a request is routed (~/acks/) — off by default
+# JARVIS_ACKS=off
+
 # Voice ID (who is speaking) — off by default; see docs/voice-id.md
 # VOICE_ID_ENABLED=false
 # VOICE_ID_CONFIRMED=0.78

@@ -15,7 +15,7 @@ CASES = {
     "Good evening, Gio. Anything else I can help with?": False,
     "Done. Is there anything else you'd like?": False,
     "Timer set for ten minutes. How else can I help?": False,
-    "The Dodgers play at 7:10 tonight. Let me know if you need anything?": False,
+    "The Mariners play at 7:10 tonight. Let me know if you need anything?": False,
     "Is it raining? Yes, light rain until noon.": False,
     "": False,
 }

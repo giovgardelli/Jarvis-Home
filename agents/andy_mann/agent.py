@@ -42,6 +42,10 @@ COMPLETION:
   ignore case, small wording differences) and emit COMPLETE_TASK with the
   EXACT task name as it appears in the library.
 - Confirm naturally: "Great — marked [task] as completed today."
+- The TASK LIBRARY above is the only truth about what has been done. Earlier
+  messages in this conversation can be out of date: never refuse to complete
+  a task because of them. Always emit COMPLETE_TASK when asked — marking a
+  task twice on the same day is harmless.
 
 ANSWERING QUESTIONS:
 - Use the data provided in context (task library, contractors, warranties,
@@ -121,6 +125,21 @@ def _build_context():
 from jarvis_core.voice import VOICE_INSTRUCTION, split_voice  # noqa: E402
 
 
+def complete_tasks(names):
+    """Mark these exact task-library names done today — no Claude call, so
+    nothing said earlier can get in the way. Used when Jarvis already knows
+    the names (a numbered task from the morning brief: "1 done")."""
+    done = [n for n in names if update_last_completed(n)]
+    missing = [n for n in names if n not in done]
+    parts = []
+    if done:
+        parts.append(f"Marked {', '.join(done)} as completed today.")
+    if missing:
+        parts.append(f"I couldn't find {', '.join(missing)} in the task library.")
+    return {"response_text": " ".join(parts), "voice_text": None,
+            "status": "not_found" if missing else "completed", "tasks": []}
+
+
 def chat(text, history=None, speaker="gio", voice_mode=False):
     """
     Returns the v1 structured contract:
@@ -154,6 +173,7 @@ def chat(text, history=None, speaker="gio", voice_mode=False):
 
     # Parse and execute commands — derive status from what actually ran
     status = "chat"
+    missing = []      # COMPLETE_TASK names the sheet didn't have
     lines = reply.split("\n")
     for line in lines:
         line = line.strip()
@@ -161,6 +181,8 @@ def chat(text, history=None, speaker="gio", voice_mode=False):
             task_name = line.split("|")[1].strip()
             ok = update_last_completed(task_name)
             status = "completed" if ok else "not_found"
+            if not ok:
+                missing.append(task_name)
         elif line.startswith("TASK_NOT_FOUND|"):
             status = "not_found"
         elif line.startswith("OUT_OF_SCOPE|"):
@@ -172,6 +194,14 @@ def chat(text, history=None, speaker="gio", voice_mode=False):
         and not l.strip().startswith("TASK_NOT_FOUND|")
         and not l.strip().startswith("OUT_OF_SCOPE|")
     ]).strip()
+
+    # Claude wrote "marked X as done" before the sheet was updated: never let
+    # that stand when the update didn't happen (it would also sit in the
+    # conversation history and make a later "mark X done" look like a repeat)
+    if missing:
+        clean_reply = (f"I couldn't find {', '.join(missing)} in the task library, "
+                       "so nothing was marked done.")
+        voice_text = None
 
     # List detection for read queries
     structured_tasks = []

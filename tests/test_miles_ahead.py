@@ -16,7 +16,7 @@ def load_calendar():
 
 def event(title, description=""):
     return {"summary": title, "description": description,
-            "start": {"dateTime": "2026-10-06T07:45:00-07:00"}, "end": {}}
+            "start": {"dateTime": "2025-05-20T07:45:00-07:00"}, "end": {}}
 
 
 class TrackedFlightParsing(unittest.TestCase):
@@ -52,12 +52,12 @@ class SouthwestDealAlert(unittest.TestCase):
         sheets.update_flight_field = lambda *a: None
         sheets.set_flight_status = lambda *a: None
         sheets.should_check_today = lambda f: True
-        sheets.get_active_flights = lambda: [{"Flight": "WN1234", "Date": "2026-10-06", "Route": "LAX-SFO",
-                                              "Departure": "2026-10-06T07:45:00-07:00", "Paid Price": "200"}]
+        sheets.get_active_flights = lambda: [{"Flight": "WN1234", "Date": "2025-05-20", "Route": "LAX-SFO",
+                                              "Departure": "2025-05-20T07:45:00-07:00", "Paid Price": "200"}]
         scraper = types.ModuleType("scraper")
         scraper.get_google_flights = lambda o, d, date: [
-            {"flight": "AS 900", "airline": "Alaska", "departs": "2026-10-06 08:00", "price": 99},
-            {"flight": "WN 1234", "airline": "Southwest", "departs": "2026-10-06 07:45", "price": 160},
+            {"flight": "AS 900", "airline": "Alaska", "departs": "2025-05-20 08:00", "price": 99},
+            {"flight": "WN 1234", "airline": "Southwest", "departs": "2025-05-20 07:45", "price": 160},
         ]
         scraper.get_flight_price = lambda *a: 200
         cal.get_tracked_flights = lambda days_ahead=60: []

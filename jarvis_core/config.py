@@ -31,6 +31,11 @@ AIRPLAY_FLAG = os.environ.get("JARVIS_AIRPLAY_FLAG", "/dev/shm/jarvis-airplay")
 # "Re-enabling voice ID".
 VOICE_ID_ENABLED = os.environ.get("VOICE_ID_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
 
+# The short "on it" / "looking into that" clip played while a request is
+# routed. Off: replies now come fast enough that it only adds a beat. The
+# clips stay in ~/acks/; JARVIS_ACKS=on brings them back.
+ACKS_ENABLED = os.environ.get("JARVIS_ACKS", "off").strip().lower() in ("1", "true", "yes", "on")
+
 
 def home_path(*parts):
     return os.path.join(HOME, *parts)

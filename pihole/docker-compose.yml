@@ -1,0 +1,41 @@
+# Pi-hole: network-wide ad blocking for the home network (see README.md here).
+#
+# Fail-safe design: the household's DHCP hands out this Pi as DNS 1 and
+# 1.1.1.1 as DNS 2, and the Pi itself resolves through public DNS (set by
+# `pihole.sh host-dns`), so if this container stops, nothing else breaks.
+#
+# Start / apply changes:  cd ~/jarvis-home/pihole && ./pihole.sh start
+services:
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    restart: unless-stopped
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "8080:80/tcp"         # web UI: http://<pi-ip>:8080/admin  (80 stays free)
+    environment:
+      TZ: "America/Los_Angeles"
+      # Bridge networking: queries arrive from outside the container's own
+      # subnet, so Pi-hole must answer every interface.
+      FTLCONF_dns_listeningMode: "all"
+      # Where Pi-hole forwards the queries it doesn't block.
+      FTLCONF_dns_upstreams: "1.1.1.1;9.9.9.9"
+      # microSD wear: keep 7 days of query history (default 91) and write it
+      # to disk every 5 minutes (default every minute).
+      FTLCONF_database_maxDBdays: "7"
+      FTLCONF_database_DBinterval: "300"
+      # The Pi already keeps its own clock; Pi-hole's time server isn't needed.
+      FTLCONF_ntp_ipv4_active: "false"
+      FTLCONF_ntp_ipv6_active: "false"
+      FTLCONF_ntp_sync_active: "false"
+      # No password here on purpose: set it once with
+      #   sudo docker exec -it pihole pihole setpassword
+      # (stored hashed in etc-pihole/, never in git).
+    volumes:
+      - "./etc-pihole:/etc/pihole"   # all settings, lists and stats; survives updates
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
